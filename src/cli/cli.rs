@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 
 use crate::aliases::generate_aliases_file;
 use crate::vscode_tasks;
+use crate::pid;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -27,20 +28,11 @@ pub fn run() {
         Some(Commands::VsCodeTasks { dir }) => {
             let path = dir.as_deref().unwrap_or(".vscode/tasks.json");
             let tasks = vscode_tasks::parser::read_tasks_from_file(path);
+            let output = pid::try_get_file().expect("Could not locate storge");
 
             match tasks {
                 Ok(tasks_json) => {
-                    // Iterate over each task
-                    for task in &tasks_json.tasks {
-                        println!("Label: {}", task.label);
-                        match &task.command {
-                            Some(cmd) => println!("Command: {}", cmd),
-                            None => println!("Command: None"),
-                        }
-                        println!("---");
-                    }
-
-                    let _ = generate_aliases_file(&tasks_json, "tasks.aliasx");
+                    let _ = generate_aliases_file(&tasks_json, &output);
                 }
                 Err(e) => eprintln!("Error parsing tasks at '{}': {}", path, e),
             }
