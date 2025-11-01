@@ -16,5 +16,12 @@ fn main() {
         return;
     }
 
-    cli::run();
+    let res = cli::run();
+    match res {
+        Ok(_) => return,
+        Err(e) => {
+            eprintln!("aliasx failed with err: {}", e);
+
+        },
+    }
 }
