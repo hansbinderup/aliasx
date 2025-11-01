@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 
+use crate::aliases::generate_aliases_file;
 use crate::vscode_tasks;
 
 #[derive(Parser)]
@@ -30,7 +31,7 @@ pub fn run() {
             match tasks {
                 Ok(tasks_json) => {
                     // Iterate over each task
-                    for task in tasks_json.tasks {
+                    for task in &tasks_json.tasks {
                         println!("Label: {}", task.label);
                         match &task.command {
                             Some(cmd) => println!("Command: {}", cmd),
@@ -38,8 +39,10 @@ pub fn run() {
                         }
                         println!("---");
                     }
+
+                    let _ = generate_aliases_file(&tasks_json, "tasks.aliasx");
                 }
-                Err(e) => eprintln!("Failed to parse tasks: {}", e),
+                Err(e) => eprintln!("Error parsing tasks at '{}': {}", path, e),
             }
         }
         None => {}
