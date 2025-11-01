@@ -1,6 +1,5 @@
-pub mod aliases;
 mod pid;
-pub mod vscode_tasks_parser;
+pub mod tasks;
 mod cli;
 
 fn main() {
