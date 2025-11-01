@@ -2,7 +2,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use crate::vscode_tasks::parser::TasksJson;
+use crate::vscode_tasks_parser::TasksJson;
 
 /// Sanitize a label to be a valid shell alias
 fn sanitize_label(label: &str) -> String {

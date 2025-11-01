@@ -1,7 +1,7 @@
 pub mod aliases;
-mod cli;
 mod pid;
-pub mod vscode_tasks;
+pub mod vscode_tasks_parser;
+mod cli;
 
 fn main() {
     if !pid::is_pid_set() {
@@ -16,5 +16,5 @@ fn main() {
         return;
     }
 
-    cli::cli::run();
+    cli::run();
 }

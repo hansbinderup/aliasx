@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 use crate::aliases::generate_aliases_file;
-use crate::vscode_tasks;
+use crate::vscode_tasks_parser;
 use crate::pid;
 
 #[derive(Parser)]
@@ -27,7 +27,7 @@ pub fn run() {
     match &cli.command {
         Some(Commands::VsCodeTasks { dir }) => {
             let path = dir.as_deref().unwrap_or(".vscode/tasks.json");
-            let tasks = vscode_tasks::parser::read_tasks_from_file(path);
+            let tasks = vscode_tasks_parser::read_tasks_from_file(path);
             let output = pid::try_get_file().expect("Could not locate storge");
 
             match tasks {
