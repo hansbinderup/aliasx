@@ -16,7 +16,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// list all aliases
-    List,
+    List {
+        /// show all details about the task
+        #[arg(short, long)]
+        detailed: bool
+    },
 
     /// parses vscode tasks.json
     Vsc {
@@ -31,8 +35,8 @@ pub fn run() -> anyhow::Result<()> {
     let id = &cli.id;
 
     match &cli.command {
-        Some(Commands::List) => {
-            tasks::list_all()?;
+        Some(Commands::List {detailed}) => {
+            tasks::list_all(*detailed)?;
         }
 
         Some(Commands::Vsc { dir }) => {

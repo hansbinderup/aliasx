@@ -84,11 +84,18 @@ fn file_exists(path: &str) -> bool {
 }
 
 /// list all tasks
-pub fn list_all() -> anyhow::Result<()> {
+pub fn list_all(detailed: bool) -> anyhow::Result<()> {
     let tasks = get_all_tasks()?;
     let width_id = tasks.tasks.len().to_string().len();
-    for (i, task) in tasks.tasks.iter().enumerate() {
-        println!("[{:0>width_id$}] {} -> {}", i, task.label, task.command);
+
+    if detailed {
+        for (i, task) in tasks.tasks.iter().enumerate() {
+            println!("[{:0>width_id$}] {} -> {}", i, task.label, task.command);
+        }
+    } else {
+        for (i, task) in tasks.tasks.iter().enumerate() {
+            println!("[{:0>width_id$}] {}", i, task.label);
+        }
     }
     Ok(())
 }
@@ -109,8 +116,8 @@ pub fn execute(id: usize) -> anyhow::Result<()> {
 
     // Inherit stdio for live output, like a normal terminal
     cmd.stdin(Stdio::inherit())
-       .stdout(Stdio::inherit())
-       .stderr(Stdio::inherit());
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
 
     // Run the command and wait for completion
     let status = cmd.status()?; // returns std::process::ExitStatus
