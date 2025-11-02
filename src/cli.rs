@@ -20,6 +20,13 @@ enum Commands {
         #[arg(short, long)]
         detailed: bool,
     },
+
+    /// use fuzzy finder
+    Fzf {
+        /// add query to search
+        #[arg(short, long)]
+        query: Option<String>,
+    },
 }
 
 pub fn run() -> anyhow::Result<()> {
@@ -33,6 +40,10 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 tasks::list_all(*detailed)?;
             }
+        }
+
+        Some(Commands::Fzf { query }) => {
+            tasks::fzf_task(query.as_deref().unwrap_or(""))?;
         }
 
         None => {

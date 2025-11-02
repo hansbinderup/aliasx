@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use execute::shell;
+use fuzzy_select::FuzzySelect;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::File;
@@ -143,6 +144,38 @@ pub fn execute(id: usize) -> anyhow::Result<()> {
     if !status.success() {
         eprintln!("Command exited with status: {:?}", status.code());
     }
+
+    Ok(())
+}
+
+pub fn fzf_task(query: &str) -> anyhow::Result<()> {
+    let tasks = get_all_tasks()?; // your TasksJson or similar
+    let width = tasks.tasks.len().to_string().len();
+
+    // Create display strings for each task
+    let task_strings: Vec<String> = tasks
+        .tasks
+        .iter()
+        .enumerate()
+        .map(|(i, task)| format!("[{:0>width$}] {}", i, task.label))
+        .collect();
+
+    // hate this.. fix it
+
+    // Show fuzzy picker and get selection index
+    let selection = FuzzySelect::new()
+        .with_prompt("Search:")
+        .with_query(query)
+        .with_options(task_strings.clone())
+        .select()?;
+
+    // Find the index of the selected string in the vector
+    let id = task_strings
+        .iter()
+        .position(|s| s == &selection)
+        .ok_or_else(|| anyhow!("Selected task not found"))?;
+
+    execute(id)?;
 
     Ok(())
 }
