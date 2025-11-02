@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use execute::shell;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -83,20 +84,37 @@ fn file_exists(path: &str) -> bool {
     return p.is_file();
 }
 
+fn print_task(task: &TaskEntry, id: usize, detailed: bool, width: usize) {
+    if detailed {
+        println!("[{:0>width$}] {} -> {}", id, task.label, task.command);
+    } else {
+        println!("[{:0>width$}] {}", id, task.label);
+    }
+}
+
+/// list all tasks
+pub fn list_at(id: usize, detailed: bool) -> anyhow::Result<()> {
+    let tasks = get_all_tasks()?;
+    let width_id = tasks.tasks.len().to_string().len();
+    let task = tasks
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("invalid id: {}", id))?;
+
+    print_task(task, id, detailed, width_id);
+
+    Ok(())
+}
+
 /// list all tasks
 pub fn list_all(detailed: bool) -> anyhow::Result<()> {
     let tasks = get_all_tasks()?;
     let width_id = tasks.tasks.len().to_string().len();
 
-    if detailed {
-        for (i, task) in tasks.tasks.iter().enumerate() {
-            println!("[{:0>width_id$}] {} -> {}", i, task.label, task.command);
-        }
-    } else {
-        for (i, task) in tasks.tasks.iter().enumerate() {
-            println!("[{:0>width_id$}] {}", i, task.label);
-        }
+    for (i, task) in tasks.tasks.iter().enumerate() {
+        print_task(task, i, detailed, width_id);
     }
+
     Ok(())
 }
 

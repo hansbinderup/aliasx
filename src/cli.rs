@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use crate::pid;
 use crate::tasks;
 
 #[derive(Parser)]
@@ -19,14 +18,7 @@ enum Commands {
     List {
         /// show all details about the task
         #[arg(short, long)]
-        detailed: bool
-    },
-
-    /// parses vscode tasks.json
-    Vsc {
-        /// optional dir
-        #[arg(short, long)]
-        dir: Option<String>,
+        detailed: bool,
     },
 }
 
@@ -35,20 +27,11 @@ pub fn run() -> anyhow::Result<()> {
     let id = &cli.id;
 
     match &cli.command {
-        Some(Commands::List {detailed}) => {
-            tasks::list_all(*detailed)?;
-        }
-
-        Some(Commands::Vsc { dir }) => {
-            let path = dir.as_deref().unwrap_or(".vscode/tasks.json");
-            let tasks = tasks::read_tasks_from_file_json(path);
-            let output = pid::try_get_file().expect("Could not locate storge");
-
-            match tasks {
-                Ok(tasks_json) => {
-                    tasks::write_tasks_to_file(&tasks_json, &output)?;
-                }
-                Err(e) => eprintln!("Error parsing tasks at '{}': {}", path, e),
+        Some(Commands::List { detailed }) => {
+            if id.is_some() {
+                tasks::list_at(id.unwrap(), *detailed)?;
+            } else {
+                tasks::list_all(*detailed)?;
             }
         }
 
