@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 
 use crate::pid;
@@ -10,17 +9,14 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// the given alias
-    alias: Option<String>,
+    /// the id of alias to run
+    id: Option<usize>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
     /// list all aliases
     List,
-
-    /// clear all aliases
-    Clear,
 
     /// parses vscode tasks.json
     Vsc {
@@ -32,17 +28,11 @@ enum Commands {
 
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let output = pid::try_get_file().expect("UPDATE ME");
-    let alias = &cli.alias;
+    let id = &cli.id;
 
     match &cli.command {
         Some(Commands::List) => {
-            let output = pid::try_get_file().expect("Could not locate storge");
-            let _ = tasks::list_all(&output)?;
-        }
-
-        Some(Commands::Clear) => {
-            let _ = tasks::clear(&output)?;
+            tasks::list_all()?;
         }
 
         Some(Commands::Vsc { dir }) => {
@@ -59,18 +49,12 @@ pub fn run() -> anyhow::Result<()> {
         }
 
         None => {
-            if alias.is_none() {
-                return Err(anyhow!("invalid input"));
+            if id.is_none() {
+                // simply do nothing
+                return Ok(());
             }
 
-            let _output = pid::try_get_file().expect("Could not locate storge");
-            // let res = aliases::try_find_alias(&output, alias.as_ref().unwrap())?;
-            // match res {
-            //     Some((label, cmd)) => {
-            //         println!("{} -> {}", label, cmd);
-            //     }
-            //     None => return Err(anyhow!("found no alias")),
-            // }
+            tasks::execute(id.unwrap())?;
         }
     }
 

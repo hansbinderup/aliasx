@@ -1,16 +1,18 @@
+use execute::shell;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 use std::fs;
-use std::io::{ BufReader, BufWriter};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
+use std::process::Stdio;
 
-#[derive(Debug, Serialize,Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
     pub label: String,
     pub command: String,
 }
 
-#[derive(Debug,Serialize,  Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Tasks {
     pub version: Option<String>,
     pub tasks: Vec<TaskEntry>,
@@ -37,13 +39,13 @@ pub fn write_tasks_to_file(tasks: &Tasks, path: &str) -> anyhow::Result<()> {
 pub fn read_tasks_from_file_yaml<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks> {
     // Open the file
     let file = File::open(path)?;
-    
+
     // Wrap in a buffered reader for efficiency
     let reader = BufReader::new(file);
-    
+
     // Parse JSON from the reader
     let tasks: Tasks = serde_yaml::from_reader(reader)?;
-    
+
     Ok(tasks)
 }
 
@@ -51,13 +53,28 @@ pub fn read_tasks_from_file_yaml<P: AsRef<Path>>(path: P) -> anyhow::Result<Task
 pub fn read_tasks_from_file_json<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks> {
     // Open the file
     let file = File::open(path)?;
-    
+
     // Wrap in a buffered reader for efficiency
     let reader = BufReader::new(file);
-    
+
     // Parse JSON from the reader
     let tasks: Tasks = serde_json5::from_reader(reader)?;
-    
+
+    Ok(tasks)
+}
+
+pub fn get_all_tasks() -> anyhow::Result<Tasks> {
+    let mut tasks = if file_exists(".aliasx.yaml") {
+        read_tasks_from_file_yaml(".aliasx.yaml")?
+    } else {
+        Tasks::default()
+    };
+
+    if file_exists(".vscode/tasks.json") {
+        let mut vscode_tasks = read_tasks_from_file_json(".vscode/tasks.json")?;
+        tasks.tasks.append(&mut vscode_tasks.tasks);
+    }
+
     Ok(tasks)
 }
 
@@ -67,26 +84,40 @@ fn file_exists(path: &str) -> bool {
 }
 
 /// list all tasks
-pub fn list_all(output_path: &str) -> anyhow::Result<()> {
-    if !file_exists(output_path) {
-        return Ok(());
+pub fn list_all() -> anyhow::Result<()> {
+    let tasks = get_all_tasks()?;
+    let width_id = tasks.tasks.len().to_string().len();
+    for (i, task) in tasks.tasks.iter().enumerate() {
+        println!("[{:0>width_id$}] {} -> {}", i, task.label, task.command);
     }
-
-    let tasks = read_tasks_from_file_yaml(output_path)?;
-    for task in &tasks.tasks {
-        println!("{} -> {}", task.label, task.command);
-    }
-
     Ok(())
 }
 
-/// list all aliases
-pub fn clear(output_path: &str) -> anyhow::Result<()> {
-    if !file_exists(output_path) {
-        return Ok(());
+pub fn execute(id: usize) -> anyhow::Result<()> {
+    let tasks = get_all_tasks()?;
+
+    if id >= tasks.tasks.len() {
+        return Err(anyhow::anyhow!("invalid id"));
     }
 
-     fs::remove_file(output_path)?;
+    let task = &tasks.tasks[id];
 
-     Ok(())
+    println!("aliasx | {}\n", task.label);
+
+    // Create a shell command via `execute` crate
+    let mut cmd = shell(&task.command);
+
+    // Inherit stdio for live output, like a normal terminal
+    cmd.stdin(Stdio::inherit())
+       .stdout(Stdio::inherit())
+       .stderr(Stdio::inherit());
+
+    // Run the command and wait for completion
+    let status = cmd.status()?; // returns std::process::ExitStatus
+
+    if !status.success() {
+        eprintln!("Command exited with status: {:?}", status.code());
+    }
+
+    Ok(())
 }
