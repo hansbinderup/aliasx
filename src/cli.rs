@@ -3,12 +3,23 @@ use clap::{Parser, Subcommand};
 use crate::tasks;
 
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(
+    version,
+    about = "Alias e(x)tended CLI",
+    long_about = "Alias e(x)tended CLI
+
+Examples:
+  aliasx                  (default to fzf)
+  aliasx ls --detailed    (list aliases with details)
+  aliasx fzf -q query     (fzf with query as search)
+  aliasx 0                (execute alias 0)
+"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// the id of alias to run
+    /// the id of alias to handle
     id: Option<usize>,
 }
 
@@ -22,7 +33,8 @@ enum Commands {
         detailed: bool,
     },
 
-    /// use fuzzy finder
+    /// use fuzzy finder (f)
+    #[command(aliases = ["f"])]
     Fzf {
         /// add query to search
         #[arg(short, long)]
