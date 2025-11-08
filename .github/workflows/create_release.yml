@@ -41,7 +41,7 @@ jobs:
         with:
           files: .release/*
           tag_name: ${{ env.VERSION }}
-          name: "meltdown-${{ env.VERSION }}"
+          name: "aliasx-${{ env.VERSION }}"
           generate_release_notes: true
           target_commitish: ${{ github.ref }}
           prerelease: ${{ github.event.inputs.pre_release }}
