@@ -48,7 +48,8 @@ pub fn run() -> anyhow::Result<()> {
 
         None => {
             if id.is_none() {
-                // simply do nothing
+                // default to fuzzy finder
+                tasks::fzf_task("")?;
                 return Ok(());
             }
 

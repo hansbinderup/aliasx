@@ -6,6 +6,7 @@ DISCLAIMER:
 * aliasx is work in progress and is merely an exploration project.
 * a project for me to explore rust and the world within
 * a way to try out package managers etc.
+* expect breaking changes, sorry.
 
 ## Features
 
