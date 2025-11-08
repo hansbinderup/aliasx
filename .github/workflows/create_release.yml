@@ -1,0 +1,52 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of the release'
+        default: 'v0.0'
+        required: true
+        type: string
+      pre_release:
+        type: boolean
+        default: false
+        description: 'Is the release a pre-release?'
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # include tags
+      - name: Set version
+        run: echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+      - name: Check if tag exists
+        run: |
+          if git ls-remote --exit-code --tags origin "${{ env.VERSION }}" >/dev/null 2>&1; then
+            echo "Tag ${{ env.VERSION }} already exists!"
+            exit 1
+          else
+            echo "Tag ${{ env.VERSION }} does not exist."
+          fi
+      - name: Build release
+        run: scripts/create_release.sh
+      - name: Upload release
+        id: upload
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .release/*
+          tag_name: ${{ env.VERSION }}
+          name: "meltdown-${{ env.VERSION }}"
+          generate_release_notes: true
+          target_commitish: ${{ github.ref }}
+          prerelease: ${{ github.event.inputs.pre_release }}
+      - name: Summary
+        run: |
+          SUMMARY=$'# Release can be found at: [${{ env.VERSION }}](${{ steps.upload.outputs.url }})'
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
