@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=${VERSION:=v0.0}
+VERSION=${VERSION:=0.0.0}
 BUILD_DIR=".build-release"
 RELEASE_DIR=".release"
 
