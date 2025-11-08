@@ -3,11 +3,6 @@ name: Create Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version of the release'
-        default: '0.0.0'
-        required: true
-        type: string
       pre_release:
         type: boolean
         default: false
@@ -23,8 +18,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # include tags
-      - name: Set version
-        run: echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+      - name: Get Cargo version
+        run: |
+          VERSION=$(cargo pkgid | sed 's/.*#//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Check if tag exists
         run: |
           if git ls-remote --exit-code --tags origin "${{ env.VERSION }}" >/dev/null 2>&1; then
