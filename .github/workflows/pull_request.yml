@@ -1,0 +1,22 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargo build
+        run: cargo build --verbose
+      - name: Cargo test
+        run: cargo test --verbose
