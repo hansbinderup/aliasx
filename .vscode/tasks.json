@@ -1,0 +1,10 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Task from .vscode/tasks.json",
+            "command": "echo 'hello from vscode/tasks.json' ",
+        },
+    ]
+}
+

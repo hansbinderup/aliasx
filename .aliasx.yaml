@@ -1,0 +1,4 @@
+version: "1.0.0"
+tasks:
+  - label: "Task from .aliasx.yaml"
+    command: "echo 'hello from .aliasx.yaml'"
