@@ -1,13 +1,9 @@
-pub mod tasks;
 mod cli;
+pub mod tasks;
 
 fn main() {
-    let res = cli::run();
-    match res {
-        Ok(_) => return,
-        Err(e) => {
-            eprintln!("aliasx failed with err: {}", e);
-
-        },
-    }
+    cli::run().unwrap_or_else(|err| {
+        eprintln!("error: {}", err);
+        std::process::exit(1);
+    });
 }
