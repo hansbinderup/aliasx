@@ -14,8 +14,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// list all aliases
-    List {
+    /// list all aliases (list)
+    #[command(aliases = ["list"])]
+    Ls {
         /// show all details about the task
         #[arg(short, long)]
         detailed: bool,
@@ -34,7 +35,7 @@ pub fn run() -> anyhow::Result<()> {
     let id = &cli.id;
 
     match &cli.command {
-        Some(Commands::List { detailed }) => {
+        Some(Commands::Ls { detailed }) => {
             if id.is_some() {
                 tasks::list_at(id.unwrap(), *detailed)?;
             } else {
