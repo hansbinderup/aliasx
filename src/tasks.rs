@@ -27,10 +27,92 @@ impl TaskEntry {
     }
 }
 
-pub struct YamlTaskReader;
-pub struct JsonTaskReader;
+impl Tasks {
+    pub fn list_at(&self, id: usize, detailed: bool) -> anyhow::Result<()> {
+        let width_id = self.tasks.len().to_string().len();
+        let task = self
+            .tasks
+            .get(id)
+            .ok_or_else(|| anyhow!("invalid id: {}", id))?;
 
-pub trait TaskReader {
+        task.print(id, detailed, width_id);
+
+        Ok(())
+    }
+
+    pub fn list_all(&self, detailed: bool) -> anyhow::Result<()> {
+        let width_id = self.tasks.len().to_string().len();
+
+        for (i, task) in self.tasks.iter().enumerate() {
+            task.print(i, detailed, width_id);
+        }
+
+        Ok(())
+    }
+
+    pub fn fzf(&self, query: &str) -> anyhow::Result<()> {
+        let width = self.tasks.len().to_string().len();
+
+        // Create display strings for each task
+        let task_strings: Vec<String> = self
+            .tasks
+            .iter()
+            .enumerate()
+            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.label))
+            .collect();
+
+        // hate this.. fix it
+
+        // Show fuzzy picker and get selection index
+        let selection = FuzzySelect::new()
+            .with_prompt("Search:")
+            .with_query(query)
+            .with_options(task_strings.clone())
+            .select()?;
+
+        // Find the index of the selected string in the vector
+        let id = task_strings
+            .iter()
+            .position(|s| s == &selection)
+            .ok_or_else(|| anyhow!("Selected task not found"))?;
+
+        self.execute(id)?;
+
+        Ok(())
+    }
+
+    pub fn execute(&self, id: usize) -> anyhow::Result<()> {
+        if id >= self.tasks.len() {
+            return Err(anyhow::anyhow!("invalid id"));
+        }
+
+        let task = &self.tasks[id];
+
+        println!("aliasx | {}\n", task.label);
+
+        // Create a shell command via `execute` crate
+        let mut cmd = shell(&task.command);
+
+        // Inherit stdio for live output, like a normal terminal
+        cmd.stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+
+        // Run the command and wait for completion
+        let status = cmd.status()?; // returns std::process::ExitStatus
+
+        if !status.success() {
+            eprintln!("Command exited with status: {:?}", status.code());
+        }
+
+        Ok(())
+    }
+}
+
+struct YamlTaskReader;
+struct JsonTaskReader;
+
+trait TaskReader {
     fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks>;
 }
 
@@ -68,91 +150,4 @@ pub fn get_all_tasks() -> anyhow::Result<Tasks> {
 fn file_exists(path: &str) -> bool {
     let p = Path::new(path);
     return p.is_file();
-}
-
-/// list all tasks
-pub fn list_at(id: usize, detailed: bool) -> anyhow::Result<()> {
-    let tasks = get_all_tasks()?;
-    let width_id = tasks.tasks.len().to_string().len();
-    let task = tasks
-        .tasks
-        .get(id)
-        .ok_or_else(|| anyhow!("invalid id: {}", id))?;
-
-    task.print(id, detailed, width_id);
-
-    Ok(())
-}
-
-/// list all tasks
-pub fn list_all(detailed: bool) -> anyhow::Result<()> {
-    let tasks = get_all_tasks()?;
-    let width_id = tasks.tasks.len().to_string().len();
-
-    for (i, task) in tasks.tasks.iter().enumerate() {
-        task.print(i, detailed, width_id);
-    }
-
-    Ok(())
-}
-
-pub fn execute(id: usize) -> anyhow::Result<()> {
-    let tasks = get_all_tasks()?;
-
-    if id >= tasks.tasks.len() {
-        return Err(anyhow::anyhow!("invalid id"));
-    }
-
-    let task = &tasks.tasks[id];
-
-    println!("aliasx | {}\n", task.label);
-
-    // Create a shell command via `execute` crate
-    let mut cmd = shell(&task.command);
-
-    // Inherit stdio for live output, like a normal terminal
-    cmd.stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    // Run the command and wait for completion
-    let status = cmd.status()?; // returns std::process::ExitStatus
-
-    if !status.success() {
-        eprintln!("Command exited with status: {:?}", status.code());
-    }
-
-    Ok(())
-}
-
-pub fn fzf_task(query: &str) -> anyhow::Result<()> {
-    let tasks = get_all_tasks()?; // your TasksJson or similar
-    let width = tasks.tasks.len().to_string().len();
-
-    // Create display strings for each task
-    let task_strings: Vec<String> = tasks
-        .tasks
-        .iter()
-        .enumerate()
-        .map(|(i, task)| format!("[{:0>width$}] {}", i, task.label))
-        .collect();
-
-    // hate this.. fix it
-
-    // Show fuzzy picker and get selection index
-    let selection = FuzzySelect::new()
-        .with_prompt("Search:")
-        .with_query(query)
-        .with_options(task_strings.clone())
-        .select()?;
-
-    // Find the index of the selected string in the vector
-    let id = task_strings
-        .iter()
-        .position(|s| s == &selection)
-        .ok_or_else(|| anyhow!("Selected task not found"))?;
-
-    execute(id)?;
-
-    Ok(())
 }

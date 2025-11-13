@@ -1,3 +1,4 @@
+pub mod aliases;
 mod cli;
 pub mod tasks;
 

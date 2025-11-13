@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::tasks;
+use crate::{aliases, tasks};
 
 #[derive(Parser)]
 #[command(
@@ -13,6 +13,8 @@ Examples:
   aliasx ls --detailed    (list aliases with details)
   aliasx fzf -q query     (fzf with query as search)
   aliasx 0                (execute alias 0)
+  aliasx -n               (fzf native aliases (.bashrc, .zshrc etc))
+  aliasx -n 0 ls -d       (list first native aliases with details)
 "
 )]
 struct Cli {
@@ -21,6 +23,10 @@ struct Cli {
 
     /// the id of alias to handle
     id: Option<usize>,
+
+    /// only apply to native aliases
+    #[arg(short, long)]
+    native: bool,
 }
 
 #[derive(Subcommand)]
@@ -45,28 +51,35 @@ enum Commands {
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let id = &cli.id;
+    let only_native = &cli.native;
+
+    let tasks = if *only_native {
+        aliases::get_aliases_as_tasks()?
+    } else {
+        tasks::get_all_tasks()?
+    };
 
     match &cli.command {
         Some(Commands::Ls { detailed }) => {
             if id.is_some() {
-                tasks::list_at(id.unwrap(), *detailed)?;
+                tasks.list_at(id.unwrap(), *detailed)?;
             } else {
-                tasks::list_all(*detailed)?;
+                tasks.list_all(*detailed)?;
             }
         }
 
         Some(Commands::Fzf { query }) => {
-            tasks::fzf_task(query.as_deref().unwrap_or(""))?;
+            tasks.fzf(query.as_deref().unwrap_or(""))?;
         }
 
         None => {
             if id.is_none() {
                 // default to fuzzy finder
-                tasks::fzf_task("")?;
+                tasks.fzf("")?;
                 return Ok(());
             }
 
-            tasks::execute(id.unwrap())?;
+            tasks.execute(id.unwrap())?;
         }
     }
 
@@ -95,6 +108,7 @@ mod tests {
 
         assert!(matches!(cli.command, Some(Commands::Ls { .. })));
         assert_eq!(cli.id, Some(2));
+        assert_eq!(cli.native, false);
     }
 
     #[test]
@@ -106,6 +120,21 @@ mod tests {
             Some(Commands::Ls { detailed }) => assert!(detailed),
             _ => panic!("Expected list command with --detailed flag"),
         }
+
+        assert_eq!(cli.native, false);
+    }
+
+    #[test]
+    fn test_list_native_detailed_flag() {
+        let args = ["aliasx", "--native", "ls", "--detailed"];
+        let cli = Cli::try_parse_from(&args).unwrap();
+
+        match cli.command {
+            Some(Commands::Ls { detailed }) => assert!(detailed),
+            _ => panic!("Expected list command with --detailed flag"),
+        }
+
+        assert_eq!(cli.native, true);
     }
 
     #[test]
@@ -114,6 +143,7 @@ mod tests {
         let cli = Cli::try_parse_from(&args).unwrap();
 
         assert!(matches!(cli.command, Some(Commands::Ls { .. })));
+        assert_eq!(cli.native, false);
     }
 
     #[test]
@@ -125,5 +155,20 @@ mod tests {
             Some(Commands::Fzf { query }) => assert_eq!(query, Some("hello".into())),
             _ => panic!("Expected fzf command with query"),
         }
+
+        assert_eq!(cli.native, false);
+    }
+
+    #[test]
+    fn test_fzf_with_native_aliases() {
+        let args = ["aliasx", "-n", "f", "--query", "native"];
+        let cli = Cli::try_parse_from(&args).unwrap();
+
+        match cli.command {
+            Some(Commands::Fzf { query }) => assert_eq!(query, Some("native".into())),
+            _ => panic!("Expected fzf command with query"),
+        }
+
+        assert_eq!(cli.native, true);
     }
 }
