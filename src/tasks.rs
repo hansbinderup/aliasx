@@ -1,7 +1,9 @@
 use anyhow::anyhow;
+use clap::ValueEnum;
 use execute::shell;
 use fuzzy_select::FuzzySelect;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::path::Path;
 use std::process::Stdio;
 
@@ -132,7 +134,35 @@ impl TaskReader for JsonTaskReader {
     }
 }
 
-pub fn get_all_tasks() -> anyhow::Result<Tasks> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TaskFilter {
+    All,
+    Local,
+    Global,
+}
+
+impl TaskFilter {
+    pub fn include_local(self) -> bool {
+        matches!(self, TaskFilter::All | TaskFilter::Local)
+    }
+
+    pub fn include_global(self) -> bool {
+        matches!(self, TaskFilter::All | TaskFilter::Global)
+    }
+}
+
+impl fmt::Display for TaskFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            TaskFilter::All => "all",
+            TaskFilter::Local => "local",
+            TaskFilter::Global => "global",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<Tasks> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
     let local_vscode_tasks = Path::new(".vscode/tasks.json");
 
@@ -140,18 +170,18 @@ pub fn get_all_tasks() -> anyhow::Result<Tasks> {
     let global_path_binding = shellexpand::tilde("~/.aliasx.yaml");
     let global_path = Path::new(global_path_binding.as_ref());
 
-    let mut tasks = if local_aliasx_path.is_file() {
+    let mut tasks = if filter.include_local() && local_aliasx_path.is_file() {
         YamlTaskReader::parse_file(local_aliasx_path)?
     } else {
         Tasks::default()
     };
 
-    if local_vscode_tasks.is_file() {
+    if filter.include_local() && local_vscode_tasks.is_file() {
         let mut vscode_tasks = JsonTaskReader::parse_file(local_vscode_tasks)?;
         tasks.tasks.append(&mut vscode_tasks.tasks);
     }
 
-    if global_path.is_file() {
+    if filter.include_global() && global_path.is_file() {
         let mut global_tasks = YamlTaskReader::parse_file(global_path)?;
         tasks.tasks.append(&mut global_tasks.tasks);
     }

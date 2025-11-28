@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand};
 
-use crate::{aliases, tasks};
+use crate::{
+    aliases,
+    tasks::{self, TaskFilter},
+};
 
 #[derive(Parser)]
 #[command(
@@ -15,6 +18,7 @@ Examples:
   aliasx 0                (execute alias 0)
   aliasx -n               (fzf native aliases (.bashrc, .zshrc etc))
   aliasx -n 0 ls -d       (list first native aliases with details)
+  aliasx -f local ls      (filter local aliases only)
 "
 )]
 struct Cli {
@@ -27,6 +31,10 @@ struct Cli {
     /// only apply to native aliases
     #[arg(short, long)]
     native: bool,
+
+    /// filter which tasks to include
+    #[arg(short, long, default_value_t = TaskFilter::All)]
+    filter: TaskFilter,
 }
 
 #[derive(Subcommand)]
@@ -51,12 +59,11 @@ enum Commands {
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let id = &cli.id;
-    let only_native = &cli.native;
 
-    let tasks = if *only_native {
+    let tasks = if cli.native {
         aliases::get_aliases_as_tasks()?
     } else {
-        tasks::get_all_tasks()?
+        tasks::get_all_tasks(cli.filter)?
     };
 
     match &cli.command {
