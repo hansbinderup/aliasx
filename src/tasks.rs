@@ -133,21 +133,28 @@ impl TaskReader for JsonTaskReader {
 }
 
 pub fn get_all_tasks() -> anyhow::Result<Tasks> {
-    let mut tasks = if file_exists(".aliasx.yaml") {
-        YamlTaskReader::parse_file(".aliasx.yaml")?
+    let local_aliasx_path = Path::new(".aliasx.yaml");
+    let local_vscode_tasks = Path::new(".vscode/tasks.json");
+
+    // tildes are handles a bit differently - needs to be expanded
+    let global_path_binding = shellexpand::tilde("~/.aliasx.yaml");
+    let global_path = Path::new(global_path_binding.as_ref());
+
+    let mut tasks = if local_aliasx_path.is_file() {
+        YamlTaskReader::parse_file(local_aliasx_path)?
     } else {
         Tasks::default()
     };
 
-    if file_exists(".vscode/tasks.json") {
-        let mut vscode_tasks = JsonTaskReader::parse_file(".vscode/tasks.json")?;
+    if local_vscode_tasks.is_file() {
+        let mut vscode_tasks = JsonTaskReader::parse_file(local_vscode_tasks)?;
         tasks.tasks.append(&mut vscode_tasks.tasks);
     }
 
-    Ok(tasks)
-}
+    if global_path.is_file() {
+        let mut global_tasks = YamlTaskReader::parse_file(global_path)?;
+        tasks.tasks.append(&mut global_tasks.tasks);
+    }
 
-fn file_exists(path: &str) -> bool {
-    let p = Path::new(path);
-    return p.is_file();
+    Ok(tasks)
 }
