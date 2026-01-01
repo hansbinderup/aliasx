@@ -15,9 +15,9 @@ Examples:
   aliasx                    (default to fzf)
   aliasx ls                 (list aliases)
   aliasx fzf -q query       (fzf with query as search)
-  aliasx -i 0               (execute alias 0)
+  aliasx --index 0          (execute alias 0)
   aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
-  aliasx -n -v --id 0 ls    (list first native aliases verbosely)
+  aliasx -n -v -i 0 ls      (list first native aliases verbosely)
   aliasx -f local ls        (filter local aliases only)
 "
 )]
@@ -25,9 +25,9 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// the id of alias to handle
+    /// the index of alias to handle
     #[arg(short, long)]
-    id: Option<usize>,
+    index: Option<usize>,
 
     /// only apply to native aliases
     #[arg(short, long)]
@@ -59,7 +59,7 @@ enum Commands {
 
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let id = &cli.id;
+    let index = &cli.index;
 
     let tasks = if cli.native {
         aliases::get_aliases_as_tasks()?
@@ -69,8 +69,8 @@ pub fn run() -> anyhow::Result<()> {
 
     match &cli.command {
         Some(Commands::Ls) => {
-            if id.is_some() {
-                tasks.list_at(id.unwrap(), cli.verbose)?;
+            if index.is_some() {
+                tasks.list_at(index.unwrap(), cli.verbose)?;
             } else {
                 tasks.list_all(cli.verbose)?;
             }
@@ -81,13 +81,13 @@ pub fn run() -> anyhow::Result<()> {
         }
 
         None => {
-            if id.is_none() {
+            if index.is_none() {
                 // default to fuzzy finder
                 tasks.fzf("", cli.verbose)?;
                 return Ok(());
             }
 
-            tasks.execute(id.unwrap(), cli.verbose)?;
+            tasks.execute(index.unwrap(), cli.verbose)?;
         }
     }
 
@@ -106,16 +106,16 @@ mod tests {
         let cli = Cli::try_parse_from(&args).unwrap();
 
         assert!(cli.command.is_none());
-        assert_eq!(cli.id, Some(7));
+        assert_eq!(cli.index, Some(7));
     }
 
     #[test]
     fn test_list_id() {
-        let args = ["aliasx", "--id", "2", "ls"];
+        let args = ["aliasx", "--index", "2", "ls"];
         let cli = Cli::try_parse_from(&args).unwrap();
 
         assert!(matches!(cli.command, Some(Commands::Ls { .. })));
-        assert_eq!(cli.id, Some(2));
+        assert_eq!(cli.index, Some(2));
         assert_eq!(cli.native, false);
     }
 
