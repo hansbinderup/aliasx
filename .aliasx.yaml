@@ -4,3 +4,20 @@ tasks:
     command: "echo 'hello from .aliasx.yaml'"
   - label: "Task that will fail"
     command: "echo 'This will fail' && exit 1"
+  - label: "Task with input"
+    command: "echo 'selected single input: ${input:some-int}'"
+  - label: "Task with multiple inputs"
+    command: "echo 'selected input: ${input:another-but-mixed} & ${input:some-int}'"
+inputs:
+  - id: some-int
+    description: "just an int"
+    options:
+    - 1
+    - 2
+    - 3
+  - id: another-but-mixed
+    options:
+    - 7.3
+    - "types"
+    - 42
+    - true
