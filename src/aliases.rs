@@ -15,7 +15,7 @@ fn parse_aliases(output: &str) -> Result<Tasks> {
                     label: name.trim().to_string(),
                     command: cmd.trim_matches('\'').to_string(),
                 };
-                tasks.tasks.push(task);
+                tasks.tasks.insert(task);
             }
         }
     }

@@ -2,12 +2,13 @@ use anyhow::anyhow;
 use clap::ValueEnum;
 use execute::shell;
 use fuzzy_select::FuzzySelect;
+use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 use std::process::Stdio;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
     pub label: String,
     pub command: String,
@@ -16,7 +17,7 @@ pub struct TaskEntry {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Tasks {
     pub version: Option<String>,
-    pub tasks: Vec<TaskEntry>,
+    pub tasks: IndexSet<TaskEntry>,
 }
 
 impl TaskEntry {
@@ -38,7 +39,7 @@ impl Tasks {
         let width_id = self.tasks.len().to_string().len();
         let task = self
             .tasks
-            .get(id)
+            .get_index(id)
             .ok_or_else(|| anyhow!("invalid id: {}", id))?;
 
         task.print(id, verbose, width_id);
