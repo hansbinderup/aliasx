@@ -2,3 +2,5 @@ version: "1.0.0"
 tasks:
   - label: "Task from .aliasx.yaml"
     command: "echo 'hello from .aliasx.yaml'"
+  - label: "Task that will fail"
+    command: "echo 'This will fail' && exit 1"
