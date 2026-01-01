@@ -12,13 +12,13 @@ use crate::{
     long_about = "Alias e(x)tended CLI
 
 Examples:
-  aliasx                  (default to fzf)
-  aliasx ls               (list aliases)
-  aliasx fzf -q query     (fzf with query as search)
-  aliasx 0                (execute alias 0)
-  aliasx -n               (fzf native aliases (.bashrc, .zshrc etc))
-  aliasx -n -v 0 ls       (list first native aliases verbosely)
-  aliasx -f local ls      (filter local aliases only)
+  aliasx                    (default to fzf)
+  aliasx ls                 (list aliases)
+  aliasx fzf -q query       (fzf with query as search)
+  aliasx -i 0               (execute alias 0)
+  aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
+  aliasx -n -v --id 0 ls    (list first native aliases verbosely)
+  aliasx -f local ls        (filter local aliases only)
 "
 )]
 struct Cli {
@@ -26,12 +26,14 @@ struct Cli {
     command: Option<Commands>,
 
     /// the id of alias to handle
+    #[arg(short, long)]
     id: Option<usize>,
 
     /// only apply to native aliases
     #[arg(short, long)]
     native: bool,
 
+    /// verbose output
     #[arg(short, long)]
     verbose: bool,
 
@@ -100,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_id_only() {
-        let args = ["aliasx", "7"];
+        let args = ["aliasx", "-i", "7"];
         let cli = Cli::try_parse_from(&args).unwrap();
 
         assert!(cli.command.is_none());
@@ -109,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_list_id() {
-        let args = ["aliasx", "2", "ls"];
+        let args = ["aliasx", "--id", "2", "ls"];
         let cli = Cli::try_parse_from(&args).unwrap();
 
         assert!(matches!(cli.command, Some(Commands::Ls { .. })));
