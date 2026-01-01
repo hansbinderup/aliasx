@@ -16,12 +16,13 @@ DISCLAIMER:
 - Compatible with `.vscode/tasks.json`
 - Global and/or project based configs
 - Fuzzy finder support
+- Variable inputs
 
 ### Future features
 
-- Add arguments (generic tasks/aliases where arguments can easily be passed)
-    - eg: `aliasx 2 build` or `aliasx 2 clean` -> inject build or clean into the command
 - Fully support all parameters in the vscode tasks
+- Support variable inputs
+    - instead of fixed input types also support manually inputting a variable
 
 ## Installation
 

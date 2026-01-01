@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, ensure, Context};
 use clap::ValueEnum;
 use execute::shell;
 use fuzzy_select::FuzzySelect;
@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 use std::process::Stdio;
+
+use crate::input::Input;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
@@ -18,6 +20,9 @@ pub struct TaskEntry {
 pub struct Tasks {
     pub version: Option<String>,
     pub tasks: IndexSet<TaskEntry>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<Input>,
 }
 
 impl TaskEntry {
@@ -94,11 +99,26 @@ impl Tasks {
         }
 
         let task = &self.tasks[id];
+        let inputs = Input::extract_variables(&task.command);
+
+        // If variables are used we need to modify the command str
+        // so take a copy and modify it locally
+        let mut task_command = task.command.clone();
+
+        for (t, i) in inputs.iter() {
+            // currently only inputs are supported
+            ensure!(t == "input", "{} variable is not yet supported", t);
+
+            let input = self.get_input(i)?;
+            let selected_input = input.fzf()?;
+
+            task_command = Input::replace_next_variable(&task_command, &selected_input);
+        }
 
         println!("aliasx | {}\n", task.format(verbose));
 
         // Create a shell command via `execute` crate
-        let mut cmd = shell(&task.command);
+        let mut cmd = shell(&task_command);
 
         // Inherit stdio for live output, like a normal terminal
         cmd.stdin(Stdio::inherit())
@@ -120,6 +140,17 @@ impl Tasks {
         }
 
         Ok(())
+    }
+
+    pub fn get_input(&self, id: &str) -> anyhow::Result<&Input> {
+        if self.inputs.is_empty() {
+            return Err(anyhow!("no inputs defined"));
+        }
+
+        self.inputs
+            .iter()
+            .find(|input| input.id == id)
+            .ok_or_else(|| anyhow!("input with id '{}' not found", id))
     }
 }
 
@@ -174,6 +205,7 @@ impl fmt::Display for TaskFilter {
     }
 }
 
+// FIXME: return Vec<Tasks> so inputs are bound to each file
 pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<Tasks> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
     let local_vscode_tasks = Path::new(".vscode/tasks.json");
@@ -191,11 +223,13 @@ pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<Tasks> {
     if filter.include_local() && local_vscode_tasks.is_file() {
         let mut vscode_tasks = JsonTaskReader::parse_file(local_vscode_tasks)?;
         tasks.tasks.append(&mut vscode_tasks.tasks);
+        tasks.inputs.append(&mut vscode_tasks.inputs);
     }
 
     if filter.include_global() && global_path.is_file() {
         let mut global_tasks = YamlTaskReader::parse_file(global_path)?;
         tasks.tasks.append(&mut global_tasks.tasks);
+        tasks.inputs.append(&mut global_tasks.inputs);
     }
 
     Ok(tasks)

@@ -1,5 +1,6 @@
 pub mod aliases;
 mod cli;
+pub mod input;
 pub mod tasks;
 
 fn main() {

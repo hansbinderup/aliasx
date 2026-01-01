@@ -5,6 +5,22 @@
             "label": "Task from .vscode/tasks.json",
             "command": "echo 'hello from vscode/tasks.json' ",
         },
+        {
+            "label": "Task from .vscode/tasks.json with input",
+            "command": "echo 'hello from ${input:some-id}'",
+        }
+    ],
+    "inputs": [
+        {
+            "id": "some-id",
+            "description": "select some id",
+            "options": [
+                "some",
+                "value",
+                "can",
+                "9999"
+            ]
+        }
     ]
 }
 
