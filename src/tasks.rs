@@ -20,39 +20,43 @@ pub struct Tasks {
 }
 
 impl TaskEntry {
-    pub fn print(&self, id: usize, detailed: bool, width: usize) {
-        if detailed {
-            println!("[{:0>width$}] {} -> {}", id, self.label, self.command);
+    pub fn format(&self, verbose: bool) -> String {
+        if verbose {
+            format!("{} -> {}", self.label, self.command)
         } else {
-            println!("[{:0>width$}] {}", id, self.label);
+            format!("{}", self.label)
         }
+    }
+
+    pub fn print(&self, id: usize, verbose: bool, width: usize) {
+        println!("[{:0>width$}] {}", id, self.format(verbose));
     }
 }
 
 impl Tasks {
-    pub fn list_at(&self, id: usize, detailed: bool) -> anyhow::Result<()> {
+    pub fn list_at(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
         let width_id = self.tasks.len().to_string().len();
         let task = self
             .tasks
             .get(id)
             .ok_or_else(|| anyhow!("invalid id: {}", id))?;
 
-        task.print(id, detailed, width_id);
+        task.print(id, verbose, width_id);
 
         Ok(())
     }
 
-    pub fn list_all(&self, detailed: bool) -> anyhow::Result<()> {
+    pub fn list_all(&self, verbose: bool) -> anyhow::Result<()> {
         let width_id = self.tasks.len().to_string().len();
 
         for (i, task) in self.tasks.iter().enumerate() {
-            task.print(i, detailed, width_id);
+            task.print(i, verbose, width_id);
         }
 
         Ok(())
     }
 
-    pub fn fzf(&self, query: &str) -> anyhow::Result<()> {
+    pub fn fzf(&self, query: &str, verbose: bool) -> anyhow::Result<()> {
         let width = self.tasks.len().to_string().len();
 
         // Create display strings for each task
@@ -60,7 +64,7 @@ impl Tasks {
             .tasks
             .iter()
             .enumerate()
-            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.label))
+            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.format(verbose)))
             .collect();
 
         // hate this.. fix it
@@ -78,19 +82,19 @@ impl Tasks {
             .position(|s| s == &selection)
             .ok_or_else(|| anyhow!("Selected task not found"))?;
 
-        self.execute(id)?;
+        self.execute(id, verbose)?;
 
         Ok(())
     }
 
-    pub fn execute(&self, id: usize) -> anyhow::Result<()> {
+    pub fn execute(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
         if id >= self.tasks.len() {
             return Err(anyhow::anyhow!("invalid id"));
         }
 
         let task = &self.tasks[id];
 
-        println!("aliasx | {}\n", task.label);
+        println!("aliasx | {}\n", task.format(verbose));
 
         // Create a shell command via `execute` crate
         let mut cmd = shell(&task.command);

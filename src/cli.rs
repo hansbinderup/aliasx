@@ -13,11 +13,11 @@ use crate::{
 
 Examples:
   aliasx                  (default to fzf)
-  aliasx ls --detailed    (list aliases with details)
+  aliasx ls               (list aliases)
   aliasx fzf -q query     (fzf with query as search)
   aliasx 0                (execute alias 0)
   aliasx -n               (fzf native aliases (.bashrc, .zshrc etc))
-  aliasx -n 0 ls -d       (list first native aliases with details)
+  aliasx -n -v 0 ls       (list first native aliases verbosely)
   aliasx -f local ls      (filter local aliases only)
 "
 )]
@@ -32,6 +32,9 @@ struct Cli {
     #[arg(short, long)]
     native: bool,
 
+    #[arg(short, long)]
+    verbose: bool,
+
     /// filter which tasks to include
     #[arg(short, long, default_value_t = TaskFilter::All)]
     filter: TaskFilter,
@@ -41,11 +44,7 @@ struct Cli {
 enum Commands {
     /// list all aliases (list)
     #[command(aliases = ["list"])]
-    Ls {
-        /// show all details about the task
-        #[arg(short, long)]
-        detailed: bool,
-    },
+    Ls,
 
     /// use fuzzy finder (f)
     #[command(aliases = ["f"])]
@@ -67,26 +66,26 @@ pub fn run() -> anyhow::Result<()> {
     };
 
     match &cli.command {
-        Some(Commands::Ls { detailed }) => {
+        Some(Commands::Ls) => {
             if id.is_some() {
-                tasks.list_at(id.unwrap(), *detailed)?;
+                tasks.list_at(id.unwrap(), cli.verbose)?;
             } else {
-                tasks.list_all(*detailed)?;
+                tasks.list_all(cli.verbose)?;
             }
         }
 
         Some(Commands::Fzf { query }) => {
-            tasks.fzf(query.as_deref().unwrap_or(""))?;
+            tasks.fzf(query.as_deref().unwrap_or(""), cli.verbose)?;
         }
 
         None => {
             if id.is_none() {
                 // default to fuzzy finder
-                tasks.fzf("")?;
+                tasks.fzf("", cli.verbose)?;
                 return Ok(());
             }
 
-            tasks.execute(id.unwrap())?;
+            tasks.execute(id.unwrap(), cli.verbose)?;
         }
     }
 
@@ -116,32 +115,6 @@ mod tests {
         assert!(matches!(cli.command, Some(Commands::Ls { .. })));
         assert_eq!(cli.id, Some(2));
         assert_eq!(cli.native, false);
-    }
-
-    #[test]
-    fn test_list_detailed_flag() {
-        let args = ["aliasx", "ls", "--detailed"];
-        let cli = Cli::try_parse_from(&args).unwrap();
-
-        match cli.command {
-            Some(Commands::Ls { detailed }) => assert!(detailed),
-            _ => panic!("Expected list command with --detailed flag"),
-        }
-
-        assert_eq!(cli.native, false);
-    }
-
-    #[test]
-    fn test_list_native_detailed_flag() {
-        let args = ["aliasx", "--native", "ls", "--detailed"];
-        let cli = Cli::try_parse_from(&args).unwrap();
-
-        match cli.command {
-            Some(Commands::Ls { detailed }) => assert!(detailed),
-            _ => panic!("Expected list command with --detailed flag"),
-        }
-
-        assert_eq!(cli.native, true);
     }
 
     #[test]
@@ -178,4 +151,13 @@ mod tests {
 
         assert_eq!(cli.native, true);
     }
+
+    #[test]
+    fn test_verbose_flag() {
+        let args = ["aliasx", "-v"];
+        let cli = Cli::try_parse_from(&args).unwrap();
+
+        assert!(cli.verbose, "Expected verbose flag to be true");
+    }
+
 }
