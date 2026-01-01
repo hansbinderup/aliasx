@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use clap::ValueEnum;
 use execute::shell;
 use fuzzy_select::FuzzySelect;
@@ -106,10 +106,17 @@ impl Tasks {
             .stderr(Stdio::inherit());
 
         // Run the command and wait for completion
-        let status = cmd.status()?; // returns std::process::ExitStatus
+        let status = cmd.status().with_context(|| "failed to execute command")?;
 
         if !status.success() {
-            eprintln!("Command exited with status: {:?}", status.code());
+            let code_str = status
+                .code()
+                .map_or_else(|| "unknown".to_string(), |c| c.to_string());
+
+            return Err(anyhow!(
+                "command exited with non-zero status (err={})",
+                code_str
+            ));
         }
 
         Ok(())
