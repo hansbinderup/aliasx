@@ -183,3 +183,222 @@ impl TaskCollection {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::Input;
+
+    fn create_test_task(label: &str, command: &str) -> TaskEntry {
+        TaskEntry {
+            label: label.to_string(),
+            command: command.to_string(),
+        }
+    }
+
+    fn create_test_tasks(entries: Vec<(&str, &str)>) -> Tasks {
+        let mut tasks = Tasks::default();
+        for (label, command) in entries {
+            tasks.tasks.insert(create_test_task(label, command));
+        }
+        tasks
+    }
+
+    fn create_test_tasks_with_inputs(
+        entries: Vec<(&str, &str)>,
+        inputs: Vec<Input>,
+    ) -> Tasks {
+        let mut tasks = create_test_tasks(entries);
+        tasks.inputs = inputs;
+        tasks
+    }
+
+    #[test]
+    fn test_total_count() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        assert_eq!(collection.total_count(), 3);
+    }
+
+    #[test]
+    fn test_total_count_empty() {
+        let collection = TaskCollection::new(vec![]);
+        assert_eq!(collection.total_count(), 0);
+    }
+
+    #[test]
+    fn test_width_idx() {
+        let source1 = create_test_tasks(vec![
+            ("task1", "echo 1"),
+            ("task2", "echo 2"),
+            ("task3", "echo 3"),
+            ("task4", "echo 4"),
+            ("task5", "echo 5"),
+            ("task6", "echo 6"),
+            ("task7", "echo 7"),
+            ("task8", "echo 8"),
+            ("task9", "echo 9"),
+            ("task10", "echo 10"),
+        ]);
+
+        let collection = TaskCollection::new(vec![source1]);
+        assert_eq!(collection.width_idx(), 2); // 10 tasks, so 2 digits
+    }
+
+    #[test]
+    fn test_all_tasks() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        let labels: Vec<String> = collection
+            .all_tasks()
+            .map(|t| t.label.clone())
+            .collect();
+
+        assert_eq!(labels, vec!["task1", "task2", "task3"]);
+    }
+
+    #[test]
+    fn test_all_tasks_with_source_indices() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3"), ("task4", "echo 4")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        let items: Vec<(usize, String)> = collection
+            .all_tasks_with_source()
+            .map(|(idx, _source, task)| (idx, task.label.clone()))
+            .collect();
+
+        assert_eq!(
+            items,
+            vec![
+                (0, "task1".to_string()),
+                (1, "task2".to_string()),
+                (2, "task3".to_string()),
+                (3, "task4".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_all_tasks_with_source_indices_three_sources() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1")]);
+        let source2 = create_test_tasks(vec![("task2", "echo 2"), ("task3", "echo 3")]);
+        let source3 = create_test_tasks(vec![("task4", "echo 4")]);
+
+        let collection = TaskCollection::new(vec![source1, source2, source3]);
+        let items: Vec<(usize, String)> = collection
+            .all_tasks_with_source()
+            .map(|(idx, _source, task)| (idx, task.label.clone()))
+            .collect();
+
+        assert_eq!(
+            items,
+            vec![
+                (0, "task1".to_string()),
+                (1, "task2".to_string()),
+                (2, "task3".to_string()),
+                (3, "task4".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_find_task_first_source() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        let (_, task) = collection.find_task(1).unwrap();
+
+        assert_eq!(task.label, "task2");
+    }
+
+    #[test]
+    fn test_find_task_second_source() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        let (_, task) = collection.find_task(2).unwrap();
+
+        assert_eq!(task.label, "task3");
+    }
+
+    #[test]
+    fn test_find_task_boundary() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
+        let source2 = create_test_tasks(vec![("task3", "echo 3"), ("task4", "echo 4")]);
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        
+        // Test boundary between sources
+        let (_, task) = collection.find_task(1).unwrap();
+        assert_eq!(task.label, "task2");
+        
+        let (_, task) = collection.find_task(2).unwrap();
+        assert_eq!(task.label, "task3");
+    }
+
+    #[test]
+    fn test_find_task_invalid_id() {
+        let source1 = create_test_tasks(vec![("task1", "echo 1")]);
+
+        let collection = TaskCollection::new(vec![source1]);
+        let result = collection.find_task(5);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("invalid index"));
+    }
+
+    #[test]
+    fn test_find_task_empty_collection() {
+        let collection = TaskCollection::new(vec![]);
+        let result = collection.find_task(0);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_task_with_correct_source() {
+        let input1 = Input {
+            id: "env1".to_string(),
+            options: vec!["dev".to_string()],
+            description: None,
+            default: None,
+        };
+
+        let input2 = Input {
+            id: "env2".to_string(),
+            options: vec!["prod".to_string()],
+            description: None,
+            default: None,
+        };
+
+        let source1 = create_test_tasks_with_inputs(
+            vec![("task1", "echo ${input:env1}")],
+            vec![input1],
+        );
+
+        let source2 = create_test_tasks_with_inputs(
+            vec![("task2", "echo ${input:env2}")],
+            vec![input2],
+        );
+
+        let collection = TaskCollection::new(vec![source1, source2]);
+        
+        // Find task from source1
+        let (source, task) = collection.find_task(0).unwrap();
+        assert_eq!(task.label, "task1");
+        assert!(source.get_input("env1").is_ok());
+        
+        // Find task from source2
+        let (source, task) = collection.find_task(1).unwrap();
+        assert_eq!(task.label, "task2");
+        assert!(source.get_input("env2").is_ok());
+    }
+}
+
