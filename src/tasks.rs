@@ -152,3 +152,145 @@ pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
 
     Ok(TaskCollection::new(sources))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::Input;
+
+    fn create_test_task(label: &str, command: &str) -> TaskEntry {
+        TaskEntry {
+            label: label.to_string(),
+            command: command.to_string(),
+        }
+    }
+
+    fn create_test_input(id: &str, options: Vec<&str>) -> Input {
+        Input {
+            id: id.to_string(),
+            options: options.iter().map(|s| s.to_string()).collect(),
+            description: None,
+            default: None,
+        }
+    }
+
+    #[test]
+    fn test_validate_config_no_inputs() {
+        let tasks = Tasks::default();
+        let task = create_test_task("simple", "echo hello");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_config_valid_input() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+
+        let task = create_test_task("deploy", "deploy ${input:env}");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_config_missing_input() {
+        let tasks = Tasks::default();
+        let task = create_test_task("deploy", "deploy ${input:missing}");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_validate_config_multiple_valid_inputs() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+        tasks.inputs.push(create_test_input("region", vec!["us", "eu"]));
+
+        let task = create_test_task("deploy", "deploy ${input:env} ${input:region}");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_validate_config_multiple_inputs_one_missing() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+
+        let task = create_test_task("deploy", "deploy ${input:env} ${input:missing}");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_validate_config_duplicate_input_references() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+
+        let task = create_test_task("deploy", "deploy ${input:env} again ${input:env}");
+
+        let result = tasks.validate_config(&task, 0, 1, false);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_get_input_exists() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+
+        let result = tasks.get_input("env");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().id, "env");
+    }
+
+    #[test]
+    fn test_get_input_not_found() {
+        let mut tasks = Tasks::default();
+        tasks.inputs.push(create_test_input("other", vec!["value"]));
+
+        let result = tasks.get_input("missing");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("not found"), "Expected 'not found' in: {}", err_msg);
+    }
+
+    #[test]
+    fn test_get_input_empty_inputs() {
+        let tasks = Tasks::default();
+
+        let result = tasks.get_input("any");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no inputs defined"));
+    }
+
+    #[test]
+    fn test_task_entry_format_verbose() {
+        let task = create_test_task("test-task", "echo hello");
+        assert_eq!(task.format(true), "test-task -> echo hello");
+    }
+
+    #[test]
+    fn test_task_entry_format_non_verbose() {
+        let task = create_test_task("test-task", "echo hello");
+        assert_eq!(task.format(false), "test-task");
+    }
+
+    #[test]
+    fn test_task_filter_include_local() {
+        assert!(TaskFilter::All.include_local());
+        assert!(TaskFilter::Local.include_local());
+        assert!(!TaskFilter::Global.include_local());
+    }
+
+    #[test]
+    fn test_task_filter_include_global() {
+        assert!(TaskFilter::All.include_global());
+        assert!(!TaskFilter::Local.include_global());
+        assert!(TaskFilter::Global.include_global());
+    }
+}
+
