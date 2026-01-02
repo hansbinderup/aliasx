@@ -1,14 +1,12 @@
-use anyhow::{anyhow, ensure, Context};
+use anyhow::anyhow;
 use clap::ValueEnum;
-use execute::shell;
-use fuzzy_select::FuzzySelect;
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
-use std::process::Stdio;
 
 use crate::input::Input;
+use crate::task_collection::TaskCollection;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
@@ -40,108 +38,6 @@ impl TaskEntry {
 }
 
 impl Tasks {
-    pub fn list_at(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
-        let width_id = self.tasks.len().to_string().len();
-        let task = self
-            .tasks
-            .get_index(id)
-            .ok_or_else(|| anyhow!("invalid id: {}", id))?;
-
-        task.print(id, verbose, width_id);
-
-        Ok(())
-    }
-
-    pub fn list_all(&self, verbose: bool) -> anyhow::Result<()> {
-        let width_id = self.tasks.len().to_string().len();
-
-        for (i, task) in self.tasks.iter().enumerate() {
-            task.print(i, verbose, width_id);
-        }
-
-        Ok(())
-    }
-
-    pub fn fzf(&self, query: &str, verbose: bool) -> anyhow::Result<()> {
-        let width = self.tasks.len().to_string().len();
-
-        // Create display strings for each task
-        let task_strings: Vec<String> = self
-            .tasks
-            .iter()
-            .enumerate()
-            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.format(verbose)))
-            .collect();
-
-        // hate this.. fix it
-
-        // Show fuzzy picker and get selection index
-        let selection = FuzzySelect::new()
-            .with_prompt("Search:")
-            .with_query(query)
-            .with_options(task_strings.clone())
-            .select()?;
-
-        // Find the index of the selected string in the vector
-        let id = task_strings
-            .iter()
-            .position(|s| s == &selection)
-            .ok_or_else(|| anyhow!("Selected task not found"))?;
-
-        self.execute(id, verbose)?;
-
-        Ok(())
-    }
-
-    pub fn execute(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
-        if id >= self.tasks.len() {
-            return Err(anyhow::anyhow!("invalid id"));
-        }
-
-        let task = &self.tasks[id];
-        let inputs = Input::extract_variables(&task.command);
-
-        // If variables are used we need to modify the command str
-        // so take a copy and modify it locally
-        let mut task_command = task.command.clone();
-
-        for (t, i) in inputs.iter() {
-            // currently only inputs are supported
-            ensure!(t == "input", "{} variable is not yet supported", t);
-
-            let input = self.get_input(i)?;
-            let selected_input = input.fzf()?;
-
-            task_command = Input::replace_next_variable(&task_command, &selected_input);
-        }
-
-        println!("aliasx | {}\n", task.format(verbose));
-
-        // Create a shell command via `execute` crate
-        let mut cmd = shell(&task_command);
-
-        // Inherit stdio for live output, like a normal terminal
-        cmd.stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
-
-        // Run the command and wait for completion
-        let status = cmd.status().with_context(|| "failed to execute command")?;
-
-        if !status.success() {
-            let code_str = status
-                .code()
-                .map_or_else(|| "unknown".to_string(), |c| c.to_string());
-
-            return Err(anyhow!(
-                "command exited with non-zero status (err={})",
-                code_str
-            ));
-        }
-
-        Ok(())
-    }
-
     pub fn get_input(&self, id: &str) -> anyhow::Result<&Input> {
         if self.inputs.is_empty() {
             return Err(anyhow!("no inputs defined"));
@@ -205,32 +101,26 @@ impl fmt::Display for TaskFilter {
     }
 }
 
-// FIXME: return Vec<Tasks> so inputs are bound to each file
-pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<Tasks> {
+pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
     let local_vscode_tasks = Path::new(".vscode/tasks.json");
 
-    // tildes are handles a bit differently - needs to be expanded
     let global_path_binding = shellexpand::tilde("~/.aliasx.yaml");
     let global_path = Path::new(global_path_binding.as_ref());
 
-    let mut tasks = if filter.include_local() && local_aliasx_path.is_file() {
-        YamlTaskReader::parse_file(local_aliasx_path)?
-    } else {
-        Tasks::default()
-    };
+    let mut sources = Vec::new();
+
+    if filter.include_local() && local_aliasx_path.is_file() {
+        sources.push(YamlTaskReader::parse_file(local_aliasx_path)?);
+    }
 
     if filter.include_local() && local_vscode_tasks.is_file() {
-        let mut vscode_tasks = JsonTaskReader::parse_file(local_vscode_tasks)?;
-        tasks.tasks.append(&mut vscode_tasks.tasks);
-        tasks.inputs.append(&mut vscode_tasks.inputs);
+        sources.push(JsonTaskReader::parse_file(local_vscode_tasks)?);
     }
 
     if filter.include_global() && global_path.is_file() {
-        let mut global_tasks = YamlTaskReader::parse_file(global_path)?;
-        tasks.tasks.append(&mut global_tasks.tasks);
-        tasks.inputs.append(&mut global_tasks.inputs);
+        sources.push(YamlTaskReader::parse_file(global_path)?);
     }
 
-    Ok(tasks)
+    Ok(TaskCollection::new(sources))
 }
