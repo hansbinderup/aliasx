@@ -20,12 +20,24 @@ impl TaskCollection {
         self.sources.iter().map(|t| t.tasks.len()).sum()
     }
 
-    fn width_id(&self) -> usize {
+    fn width_idx(&self) -> usize {
         self.total_count().to_string().len()
     }
 
     fn all_tasks(&self) -> impl Iterator<Item = &TaskEntry> {
         self.sources.iter().flat_map(|t| t.tasks.iter())
+    }
+
+    fn all_tasks_with_source(&self) -> impl Iterator<Item = (usize, &Tasks, &TaskEntry)> {
+        let mut global_idx = 0;
+        self.sources.iter().flat_map(move |source| {
+            let start_idx = global_idx;
+            global_idx += source.tasks.len();
+            
+            source.tasks.iter().enumerate().map(move |(local_idx, task)| {
+                (start_idx + local_idx, source, task)
+            })
+        })
     }
 
     fn find_task(&self, id: usize) -> anyhow::Result<(&Tasks, &TaskEntry)> {
@@ -35,10 +47,9 @@ impl TaskCollection {
             let next_idx = current_idx + task_set.tasks.len();
             if id < next_idx {
                 let local_idx = id - current_idx;
-                let task = task_set
-                    .tasks
-                    .get_index(local_idx)
-                    .ok_or_else(|| anyhow!("internal_error! local idx '{}' not found", local_idx))?;
+                let task = task_set.tasks.get_index(local_idx).ok_or_else(|| {
+                    anyhow!("internal_error! local idx '{}' not found", local_idx)
+                })?;
 
                 return Ok((task_set, task));
             }
@@ -49,16 +60,52 @@ impl TaskCollection {
         Err(anyhow!("invalid index '{}'", id))
     }
 
+    pub fn validate_all(&self, verbose: bool) {
+        let mut failed = 0;
+        let mut total = 0;
+        let width_idx = self.width_idx();
+
+        for (idx, source, task) in self.all_tasks_with_source() {
+            if !source.validate_config(&task, idx, width_idx, verbose) {
+                failed += 1;
+            }
+
+            total += 1;
+        }
+
+        if failed == 0 {
+            println!("✅ All {} tasks validated successfully!", total);
+        } else {
+            println!(
+                "❌ Validation failed for {} out of {} tasks!",
+                failed, total
+            );
+        }
+    }
+
+    pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
+        let (source, task) = self.find_task(idx)?;
+        let success = source.validate_config(&task, idx, self.width_idx(), verbose);
+
+        if success {
+            println!("✅ validation was successful");
+        } else {
+            println!("❌ validation failed");
+        }
+
+        Ok(())
+    }
+
     pub fn list_at(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
         let (_, task) = self.find_task(id)?;
-        task.print(id, verbose, self.width_id());
+        task.print(id, verbose, self.width_idx());
 
         Ok(())
     }
 
     pub fn list_all(&self, verbose: bool) -> anyhow::Result<()> {
         for (idx, task) in self.all_tasks().enumerate() {
-            task.print(idx, verbose, self.width_id());
+            task.print(idx, verbose, self.width_idx());
         }
 
         Ok(())
@@ -73,7 +120,7 @@ impl TaskCollection {
                     "[{:0>width$}] {}",
                     i,
                     task.format(verbose),
-                    width = self.width_id()
+                    width = self.width_idx()
                 )
             })
             .collect();

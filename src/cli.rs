@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand};
 
-use crate::{aliases, tasks::{self, TaskFilter}};
+use crate::{
+    aliases,
+    tasks::{self, TaskFilter},
+};
 
 #[derive(Parser)]
 #[command(
@@ -16,6 +19,7 @@ Examples:
   aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
   aliasx -n -v -i 0 ls      (list first native aliases verbosely)
   aliasx -f local ls        (filter local aliases only)
+  aliasx -v validate        (validates all configs verbosely)
 "
 )]
 struct Cli {
@@ -52,6 +56,10 @@ enum Commands {
         #[arg(short, long)]
         query: Option<String>,
     },
+
+    /// run validation on configs files
+    #[command()]
+    Validate,
 }
 
 pub fn run() -> anyhow::Result<()> {
@@ -66,8 +74,8 @@ pub fn run() -> anyhow::Result<()> {
 
     match &cli.command {
         Some(Commands::Ls) => {
-            if index.is_some() {
-                tasks.list_at(index.unwrap(), cli.verbose)?;
+            if let Some(idx) = cli.index {
+                tasks.list_at(idx, cli.verbose)?;
             } else {
                 tasks.list_all(cli.verbose)?;
             }
@@ -75,6 +83,14 @@ pub fn run() -> anyhow::Result<()> {
 
         Some(Commands::Fzf { query }) => {
             tasks.fzf(query.as_deref().unwrap_or(""), cli.verbose)?;
+        }
+
+        Some(Commands::Validate) => {
+            if let Some(idx) = cli.index {
+                tasks.validate_at(idx, cli.verbose)?;
+            } else {
+                tasks.validate_all(cli.verbose);
+            }
         }
 
         None => {
