@@ -10,13 +10,13 @@ static VARIABLE_REGEX: LazyLock<Regex> =
 static REPLACE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\$\{.*?\}").expect("invalid regex"));
 
-// TODO: add default option
 // TODO: reuse inputs if same type is specified twice?
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Input {
     pub id: String,
     pub options: Vec<String>,
     pub description: Option<String>,
+    pub default: Option<String>,
 }
 
 // Input is defined as ${<type>:<id>}
@@ -33,6 +33,13 @@ impl Input {
         REPLACE_REGEX.replace(s, replacement).to_string()
     }
 
+    fn get_default_selection(&self) -> u32 {
+        self.default
+            .as_deref()
+            .and_then(|d| self.options.iter().position(|opt| opt == d))
+            .unwrap_or(0) as u32
+    }
+
     pub fn fzf(&self) -> anyhow::Result<String> {
         let prompt = format!(
             "input | {}:",
@@ -43,6 +50,7 @@ impl Input {
         let selection = FuzzySelect::new()
             .with_prompt(prompt)
             .with_options(self.options.clone())
+            .with_initial_selection(self.get_default_selection())
             .select()?;
 
         Ok(selection)
@@ -165,5 +173,75 @@ mod tests {
         let input = "no variables";
         let replaced = Input::replace_next_variable(input, "replacement");
         assert_eq!(replaced, "no variables");
+    }
+
+    #[test]
+    fn test_input_with_default() {
+        let yaml = r#"
+        - id: environment
+          description: 'Select environment'
+          options:
+              - dev
+              - staging
+              - prod
+          default: staging
+        "#;
+
+        let values: Vec<Input> = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0].default, Some("staging".to_string()));
+        assert_eq!(values[0].get_default_selection(), 1);
+    }
+
+    #[test]
+    fn test_input_without_default() {
+        let yaml = r#"
+        - id: choice
+          options:
+              - option1
+              - option2
+        "#;
+
+        let values: Vec<Input> = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(values[0].default, None);
+        assert_eq!(values[0].get_default_selection(), 0);
+    }
+
+    #[test]
+    fn test_input_default_not_in_options() {
+        let yaml = r#"
+        - id: test
+          options:
+              - a
+              - b
+          default: c
+        "#;
+
+        let values: Vec<Input> = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(values[0].default, Some("c".to_string()));
+        // Default not in options, falls back to 0
+        assert_eq!(values[0].get_default_selection(), 0);
+    }
+
+    #[test]
+    fn test_get_default_selection_first() {
+        let input = Input {
+            id: "test".to_string(),
+            options: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            description: None,
+            default: Some("a".to_string()),
+        };
+        assert_eq!(input.get_default_selection(), 0);
+    }
+
+    #[test]
+    fn test_get_default_selection_last() {
+        let input = Input {
+            id: "test".to_string(),
+            options: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            description: None,
+            default: Some("c".to_string()),
+        };
+        assert_eq!(input.get_default_selection(), 2);
     }
 }

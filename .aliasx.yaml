@@ -11,6 +11,7 @@ tasks:
 inputs:
   - id: some-int
     description: "just an int"
+    default: 2
     options:
     - 1
     - 2
