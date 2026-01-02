@@ -1,9 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::{
-    aliases,
-    tasks::{self, TaskFilter},
-};
+use crate::{aliases, tasks::{self, TaskFilter}};
 
 #[derive(Parser)]
 #[command(
@@ -82,7 +79,6 @@ pub fn run() -> anyhow::Result<()> {
 
         None => {
             if index.is_none() {
-                // default to fuzzy finder
                 tasks.fzf("", cli.verbose)?;
                 return Ok(());
             }
@@ -161,5 +157,4 @@ mod tests {
 
         assert!(cli.verbose, "Expected verbose flag to be true");
     }
-
 }

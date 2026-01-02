@@ -2,6 +2,7 @@ use anyhow::Result;
 use execute::Execute;
 use std::process::{Command, Stdio};
 
+use crate::task_collection::TaskCollection;
 use crate::tasks::{TaskEntry, Tasks};
 
 fn parse_aliases(output: &str) -> Result<Tasks> {
@@ -23,20 +24,17 @@ fn parse_aliases(output: &str) -> Result<Tasks> {
     Ok(tasks)
 }
 
-pub fn get_aliases_as_tasks() -> anyhow::Result<Tasks> {
-    // try to determine the user's shell or default to bash
+pub fn get_aliases_as_tasks() -> anyhow::Result<TaskCollection> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
 
-    // call 'alias' interactively and as command (ic)
     let mut command = Command::new(shell);
     command.args(["-ic", "alias"]);
-
     command.stdout(Stdio::piped());
 
     let output = command.execute_output()?;
 
     match output.status.code() {
-        Some(0) => {} // success
+        Some(0) => {}
         Some(code) => {
             return Err(anyhow::anyhow!(
                 "calling 'alias' failed (exit code {})",
@@ -47,6 +45,7 @@ pub fn get_aliases_as_tasks() -> anyhow::Result<Tasks> {
     }
 
     let output_str = String::from_utf8(output.stdout)?;
+    let aliases = parse_aliases(&output_str)?;
 
-    parse_aliases(&output_str)
+    Ok(TaskCollection::new(vec![aliases]))
 }
