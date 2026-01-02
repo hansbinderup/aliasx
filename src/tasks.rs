@@ -48,6 +48,34 @@ impl Tasks {
             .find(|input| input.id == id)
             .ok_or_else(|| anyhow!("input with id '{}' not found", id))
     }
+
+    pub fn validate_config(&self, task: &TaskEntry, idx: usize, width_idx: usize, verbose: bool) -> bool {
+        Input::extract_variables(&task.command)
+            .iter()
+            .all(|(_var_type, var_id)| match self.get_input(var_id) {
+                Ok(input) => {
+                    if verbose {
+                        println!("✅ [{:0>width_idx$}] input '{}' is defined", idx, input.id);
+                    }
+
+                    true
+                }
+                Err(_) => {
+                    println!(
+                        "❌ [{:0>width_idx$}] input '{}' not defined{}",
+                        idx,
+                        var_id,
+                        if verbose {
+                            format!(" | cmd: {}", task.command)
+                        } else {
+                            String::new()
+                        }
+                    );
+
+                    false
+                }
+            })
+    }
 }
 
 struct YamlTaskReader;
