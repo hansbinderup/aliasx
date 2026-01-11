@@ -1,6 +1,7 @@
 pub mod aliases;
 mod cli;
 pub mod input;
+pub mod input_mapping;
 pub mod task_collection;
 pub mod tasks;
 
