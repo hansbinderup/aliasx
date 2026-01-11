@@ -1,6 +1,7 @@
 use anyhow::{anyhow, ensure, Context};
 use execute::shell;
 use fuzzy_select::FuzzySelect;
+use indexmap::IndexSet;
 use std::process::Stdio;
 
 use crate::input::Input;
@@ -24,8 +25,11 @@ impl TaskCollection {
         self.total_count().to_string().len()
     }
 
-    fn all_tasks(&self) -> impl Iterator<Item = &TaskEntry> {
-        self.sources.iter().flat_map(|t| t.tasks.iter())
+    fn all_tasks(&self) -> IndexSet<&TaskEntry> {
+        self.sources
+            .iter()
+            .flat_map(|t| t.tasks.iter())
+            .collect()
     }
 
     fn all_tasks_with_source(&self) -> impl Iterator<Item = (usize, &Tasks, &TaskEntry)> {
@@ -33,10 +37,12 @@ impl TaskCollection {
         self.sources.iter().flat_map(move |source| {
             let start_idx = global_idx;
             global_idx += source.tasks.len();
-            
-            source.tasks.iter().enumerate().map(move |(local_idx, task)| {
-                (start_idx + local_idx, source, task)
-            })
+
+            source
+                .tasks
+                .iter()
+                .enumerate()
+                .map(move |(local_idx, task)| (start_idx + local_idx, source, task))
         })
     }
 
@@ -104,7 +110,7 @@ impl TaskCollection {
     }
 
     pub fn list_all(&self, verbose: bool) -> anyhow::Result<()> {
-        for (idx, task) in self.all_tasks().enumerate() {
+        for (idx, task) in self.all_tasks().iter().enumerate() {
             task.print(idx, verbose, self.width_idx());
         }
 
@@ -112,28 +118,24 @@ impl TaskCollection {
     }
 
     pub fn fzf(&self, query: &str, verbose: bool) -> anyhow::Result<()> {
-        let task_strings: Vec<String> = self
+        let width = self.width_idx();
+
+        // Build IndexSet of display strings directly, avoiding intermediate collections
+        let task_strings: IndexSet<String> = self
             .all_tasks()
+            .iter()
             .enumerate()
-            .map(|(i, task)| {
-                format!(
-                    "[{:0>width$}] {}",
-                    i,
-                    task.format(verbose),
-                    width = self.width_idx()
-                )
-            })
+            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.format(verbose)))
             .collect();
 
         let selection = FuzzySelect::new()
             .with_prompt("Search:")
             .with_query(query)
-            .with_options(task_strings.clone())
+            .with_options(task_strings.iter().map(|s| s.as_str()).collect::<Vec<_>>())
             .select()?;
 
         let id = task_strings
-            .iter()
-            .position(|s| s == &selection)
+            .get_index_of(selection)
             .ok_or_else(|| anyhow!("Selected task not found"))?;
 
         self.execute(id, verbose)?;
@@ -204,10 +206,7 @@ mod tests {
         tasks
     }
 
-    fn create_test_tasks_with_inputs(
-        entries: Vec<(&str, &str)>,
-        inputs: Vec<Input>,
-    ) -> Tasks {
+    fn create_test_tasks_with_inputs(entries: Vec<(&str, &str)>, inputs: Vec<Input>) -> Tasks {
         let mut tasks = create_test_tasks(entries);
         tasks.inputs = inputs;
         tasks
@@ -252,11 +251,11 @@ mod tests {
         let source1 = create_test_tasks(vec![("task1", "echo 1"), ("task2", "echo 2")]);
         let source2 = create_test_tasks(vec![("task3", "echo 3")]);
 
-        let collection = TaskCollection::new(vec![source1, source2]);
-        let labels: Vec<String> = collection
-            .all_tasks()
-            .map(|t| t.label.clone())
-            .collect();
+        // duplicate task in source3 to test uniqueness and order
+        let source3 = create_test_tasks(vec![("task3", "echo 3")]);
+
+        let collection = TaskCollection::new(vec![source1, source2, source3]);
+        let labels: Vec<String> = collection.all_tasks().iter().map(|t| t.label.clone()).collect();
 
         assert_eq!(labels, vec!["task1", "task2", "task3"]);
     }
@@ -334,11 +333,11 @@ mod tests {
         let source2 = create_test_tasks(vec![("task3", "echo 3"), ("task4", "echo 4")]);
 
         let collection = TaskCollection::new(vec![source1, source2]);
-        
+
         // Test boundary between sources
         let (_, task) = collection.find_task(1).unwrap();
         assert_eq!(task.label, "task2");
-        
+
         let (_, task) = collection.find_task(2).unwrap();
         assert_eq!(task.label, "task3");
     }
@@ -378,27 +377,22 @@ mod tests {
             default: None,
         };
 
-        let source1 = create_test_tasks_with_inputs(
-            vec![("task1", "echo ${input:env1}")],
-            vec![input1],
-        );
+        let source1 =
+            create_test_tasks_with_inputs(vec![("task1", "echo ${input:env1}")], vec![input1]);
 
-        let source2 = create_test_tasks_with_inputs(
-            vec![("task2", "echo ${input:env2}")],
-            vec![input2],
-        );
+        let source2 =
+            create_test_tasks_with_inputs(vec![("task2", "echo ${input:env2}")], vec![input2]);
 
         let collection = TaskCollection::new(vec![source1, source2]);
-        
+
         // Find task from source1
         let (source, task) = collection.find_task(0).unwrap();
         assert_eq!(task.label, "task1");
         assert!(source.get_input("env1").is_ok());
-        
+
         // Find task from source2
         let (source, task) = collection.find_task(1).unwrap();
         assert_eq!(task.label, "task2");
         assert!(source.get_input("env2").is_ok());
     }
 }
-
