@@ -1,11 +1,13 @@
 use anyhow::{anyhow, Context};
 use execute::shell;
 use fuzzy_select::FuzzySelect;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use std::process::Stdio;
 
-use crate::input::Input;
-use crate::tasks::{TaskEntry, Tasks};
+use crate::{
+    input::Input,
+    tasks::{TaskEntry, Tasks},
+};
 
 #[derive(Debug, Default)]
 pub struct TaskCollection {
@@ -26,10 +28,7 @@ impl TaskCollection {
     }
 
     fn all_tasks(&self) -> IndexSet<&TaskEntry> {
-        self.sources
-            .iter()
-            .flat_map(|t| t.tasks.iter())
-            .collect()
+        self.sources.iter().flat_map(|t| t.tasks.iter()).collect()
     }
 
     fn all_tasks_with_source(&self) -> impl Iterator<Item = (usize, &Tasks, &TaskEntry)> {
@@ -146,6 +145,7 @@ impl TaskCollection {
     pub fn execute(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
         let (task_set, task) = self.find_task(id)?;
         let inputs = Input::extract_variables(&task.command);
+        let mut input_selections = IndexMap::new();
 
         let mut task_command = task.command.clone();
 
@@ -153,8 +153,11 @@ impl TaskCollection {
             let input = task_set.get_input(input_id)?;
             let selected_input = input.fzf()?;
 
+            input_selections.insert(input_id.clone(), selected_input.clone());
             task_command = Input::replace_next_variable(&task_command, &selected_input);
         }
+
+        task_command = task_set.apply_mappings(&task_command, &mut input_selections)?;
 
         println!("aliasx | {}\n", task.format(verbose));
 
@@ -248,7 +251,11 @@ mod tests {
         let source3 = create_test_tasks(vec![("task3", "echo 3")]);
 
         let collection = TaskCollection::new(vec![source1, source2, source3]);
-        let labels: Vec<String> = collection.all_tasks().iter().map(|t| t.label.clone()).collect();
+        let labels: Vec<String> = collection
+            .all_tasks()
+            .iter()
+            .map(|t| t.label.clone())
+            .collect();
 
         assert_eq!(labels, vec!["task1", "task2", "task3"]);
     }

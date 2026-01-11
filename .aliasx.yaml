@@ -7,18 +7,46 @@ tasks:
   - label: "Task with input"
     command: "echo 'selected single input: ${input:some-int}'"
   - label: "Task with multiple inputs"
-    command: "echo 'selected input: ${input:another-but-mixed} & ${input:some-int}'"
+    command: "echo 'selected input: ${input:mixed-types} & ${input:some-int}'"
+  - label: "Task with input and mappings"
+    command: "echo 'input: ${input:some-int}, picker: ${mapping:picker}, shouter: ${mapping:shouter}'"
+  - label: "Task with multi input and mappings"
+    command: "echo 'selected input: ${input:some-int} & ${input:mixed-types} which means: ${mapping:picker} & ${mapping:types}'"
+  - label: "Task with missing mappings"
+    command: "echo 'error: mapping: ${mapping:some-invalid-map}'"
+  - label: "Task with mappings but no input"
+    command: "echo 'input: NONE, mapping: ${mapping:picker}'"
 inputs:
   - id: some-int
     description: "just an int"
     default: 2
     options:
-    - 1
-    - 2
-    - 3
-  - id: another-but-mixed
+      - 1
+      - 2
+      - 3
+  - id: mixed-types
     options:
-    - 7.3
-    - "types"
-    - 42
-    - true
+      - 7.3
+      - "types"
+      - 42
+      - true
+mappings:
+  - id: picker
+    input: some-int
+    options:
+      1: "you picked one"
+      2: "you picked two"
+      3: "you picked three"
+  - id: shouter
+    input: some-int
+    options:
+      1: "ONE!!"
+      2: "TWO!!"
+      3: "THREE!!"
+  - id: types
+    input: mixed-types
+    options:
+      7.3: "float type"
+      "types": "string type"
+      42: "integer type"
+      true: "boolean type"
