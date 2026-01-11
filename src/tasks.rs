@@ -1,11 +1,12 @@
 use anyhow::anyhow;
 use clap::ValueEnum;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::Path;
 
 use crate::input::Input;
+use crate::input_mapping::InputMapping;
 use crate::task_collection::TaskCollection;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -21,6 +22,9 @@ pub struct Tasks {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub inputs: Vec<Input>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mappings: Vec<InputMapping>,
 }
 
 impl TaskEntry {
@@ -49,8 +53,64 @@ impl Tasks {
             .ok_or_else(|| anyhow!("input with id '{}' not found", id))
     }
 
-    pub fn validate_config(&self, task: &TaskEntry, idx: usize, width_idx: usize, verbose: bool) -> bool {
-        Input::extract_variables(&task.command)
+    pub fn get_mapping(&self, id: &str) -> anyhow::Result<&InputMapping> {
+        if self.mappings.is_empty() {
+            return Err(anyhow!("no mappings defined"));
+        }
+
+        self.mappings
+            .iter()
+            .find(|input| input.id == id)
+            .ok_or_else(|| anyhow!("mapping with id '{}' not found", id))
+    }
+
+    pub fn apply_mappings(
+        &self,
+        command: &str,
+        input_selections: &mut IndexMap<String, String>,
+    ) -> anyhow::Result<String> {
+        let mapping_strings = InputMapping::extract_from_str(command);
+        let mut mapped_str = command.to_string();
+
+        for map_str in mapping_strings {
+            let input_mapping = self.get_mapping(&map_str)?;
+            let key = &input_mapping.input;
+
+            /* if input is not already selected, prompt for it */
+            if !input_selections.contains_key(key) {
+                let fzf_selection = self.get_input(key)?.fzf()?;
+                input_selections.insert(key.clone(), fzf_selection);
+            }
+
+            /* we could unwrap here since we just inserted it if it was missing
+             *  but let's be pragmatic with user warnings/errors */
+            let sel_value = input_selections
+                .get(key)
+                .ok_or_else(|| anyhow!("no selection found for input '{}'", key))?;
+
+            let mapping = input_mapping.options.get(sel_value).ok_or_else(|| {
+                anyhow!(
+                    "no mapping found for selection '{}' in input '{}'",
+                    sel_value,
+                    key
+                )
+            })?;
+
+            mapped_str = InputMapping::replace_all(&mapped_str, &input_mapping.id, mapping)?;
+        }
+
+        Ok(mapped_str)
+    }
+
+    pub fn validate_config(
+        &self,
+        task: &TaskEntry,
+        idx: usize,
+        width_idx: usize,
+        verbose: bool,
+    ) -> bool {
+        /* validate inputs */
+        return Input::extract_variables(&task.command)
             .iter()
             .all(|var_id| match self.get_input(var_id) {
                 Ok(input) => {
@@ -74,7 +134,7 @@ impl Tasks {
 
                     false
                 }
-            })
+            });
     }
 }
 
@@ -185,7 +245,9 @@ mod tests {
     #[test]
     fn test_validate_config_valid_input() {
         let mut tasks = Tasks::default();
-        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+        tasks
+            .inputs
+            .push(create_test_input("env", vec!["dev", "prod"]));
 
         let task = create_test_task("deploy", "deploy ${input:env}");
 
@@ -205,8 +267,12 @@ mod tests {
     #[test]
     fn test_validate_config_multiple_valid_inputs() {
         let mut tasks = Tasks::default();
-        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
-        tasks.inputs.push(create_test_input("region", vec!["us", "eu"]));
+        tasks
+            .inputs
+            .push(create_test_input("env", vec!["dev", "prod"]));
+        tasks
+            .inputs
+            .push(create_test_input("region", vec!["us", "eu"]));
 
         let task = create_test_task("deploy", "deploy ${input:env} ${input:region}");
 
@@ -217,7 +283,9 @@ mod tests {
     #[test]
     fn test_validate_config_multiple_inputs_one_missing() {
         let mut tasks = Tasks::default();
-        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+        tasks
+            .inputs
+            .push(create_test_input("env", vec!["dev", "prod"]));
 
         let task = create_test_task("deploy", "deploy ${input:env} ${input:missing}");
 
@@ -228,7 +296,9 @@ mod tests {
     #[test]
     fn test_validate_config_duplicate_input_references() {
         let mut tasks = Tasks::default();
-        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+        tasks
+            .inputs
+            .push(create_test_input("env", vec!["dev", "prod"]));
 
         let task = create_test_task("deploy", "deploy ${input:env} again ${input:env}");
 
@@ -239,7 +309,9 @@ mod tests {
     #[test]
     fn test_get_input_exists() {
         let mut tasks = Tasks::default();
-        tasks.inputs.push(create_test_input("env", vec!["dev", "prod"]));
+        tasks
+            .inputs
+            .push(create_test_input("env", vec!["dev", "prod"]));
 
         let result = tasks.get_input("env");
         assert!(result.is_ok());
@@ -254,7 +326,11 @@ mod tests {
         let result = tasks.get_input("missing");
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("not found"), "Expected 'not found' in: {}", err_msg);
+        assert!(
+            err_msg.contains("not found"),
+            "Expected 'not found' in: {}",
+            err_msg
+        );
     }
 
     #[test]
@@ -263,7 +339,10 @@ mod tests {
 
         let result = tasks.get_input("any");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("no inputs defined"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no inputs defined"));
     }
 
     #[test]
@@ -292,4 +371,3 @@ mod tests {
         assert!(TaskFilter::Global.include_global());
     }
 }
-
