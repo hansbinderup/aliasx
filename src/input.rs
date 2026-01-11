@@ -4,13 +4,12 @@ use fuzzy_select::FuzzySelect;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-static VARIABLE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\$\{([^:}]+):([^}]+)\}").expect("invalid regex"));
+static FIND_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{input:([^}]+)\}").expect("invalid regex"));
 
 static REPLACE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\$\{.*?\}").expect("invalid regex"));
+    LazyLock::new(|| Regex::new(r"\$\{input:[^}]+\}").expect("invalid regex"));
 
-// TODO: reuse inputs if same type is specified twice?
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Input {
     pub id: String,
@@ -20,12 +19,11 @@ pub struct Input {
 }
 
 // Input is defined as ${<type>:<id>}
-// FIXME: add type as enum when adding support for runtime arguments
 impl Input {
-    pub fn extract_variables(s: &str) -> Vec<(String, String)> {
-        VARIABLE_REGEX
+    pub fn extract_variables(s: &str) -> Vec<String> {
+        FIND_REGEX
             .captures_iter(s)
-            .map(|cap| (cap[1].to_string(), cap[2].to_string()))
+            .map(|cap| cap[1].to_string())
             .collect()
     }
 
@@ -128,8 +126,8 @@ mod tests {
         let vars = Input::extract_variables(input);
 
         assert_eq!(vars.len(), 2);
-        assert_eq!(vars[0], ("input".to_string(), "environment".to_string()));
-        assert_eq!(vars[1], ("input".to_string(), "region".to_string()));
+        assert_eq!(vars[0], "environment".to_string());
+        assert_eq!(vars[1], "region".to_string());
     }
 
     #[test]
@@ -141,13 +139,14 @@ mod tests {
 
     #[test]
     fn test_extract_variables_complex() {
-        let input = "cmd ${type1:id-1} ${type2:id_2} ${type3:id.3}";
+        let input =
+            "cmd ${input:id-1} ${input:id_2} ${input:id.3} ${not_input:id4} ${input_not:id5}";
         let vars = Input::extract_variables(input);
 
         assert_eq!(vars.len(), 3);
-        assert_eq!(vars[0], ("type1".to_string(), "id-1".to_string()));
-        assert_eq!(vars[1], ("type2".to_string(), "id_2".to_string()));
-        assert_eq!(vars[2], ("type3".to_string(), "id.3".to_string()));
+        assert_eq!(vars[0], "id-1".to_string());
+        assert_eq!(vars[1], "id_2".to_string());
+        assert_eq!(vars[2], "id.3".to_string());
     }
 
     #[test]
