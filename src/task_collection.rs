@@ -1,4 +1,4 @@
-use anyhow::{anyhow, ensure, Context};
+use anyhow::{anyhow, Context};
 use execute::shell;
 use fuzzy_select::FuzzySelect;
 use indexmap::IndexSet;
@@ -149,14 +149,8 @@ impl TaskCollection {
 
         let mut task_command = task.command.clone();
 
-        for (var_type, var_id) in inputs.iter() {
-            ensure!(
-                var_type == "input",
-                "{} variable is not yet supported",
-                var_type
-            );
-
-            let input = task_set.get_input(var_id)?;
+        for input_id in inputs.iter() {
+            let input = task_set.get_input(input_id)?;
             let selected_input = input.fzf()?;
 
             task_command = Input::replace_next_variable(&task_command, &selected_input);
@@ -189,7 +183,6 @@ impl TaskCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::Input;
 
     fn create_test_task(label: &str, command: &str) -> TaskEntry {
         TaskEntry {

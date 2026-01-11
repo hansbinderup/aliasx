@@ -52,7 +52,7 @@ impl Tasks {
     pub fn validate_config(&self, task: &TaskEntry, idx: usize, width_idx: usize, verbose: bool) -> bool {
         Input::extract_variables(&task.command)
             .iter()
-            .all(|(_var_type, var_id)| match self.get_input(var_id) {
+            .all(|var_id| match self.get_input(var_id) {
                 Ok(input) => {
                     if verbose {
                         println!("✅ [{:0>width_idx$}] input '{}' is defined", idx, input.id);
@@ -156,7 +156,6 @@ pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::Input;
 
     fn create_test_task(label: &str, command: &str) -> TaskEntry {
         TaskEntry {
