@@ -7,6 +7,7 @@ use std::process::Stdio;
 use crate::{
     input::Input,
     tasks::{TaskEntry, Tasks},
+    validator::Validator,
 };
 
 #[derive(Debug, Default)]
@@ -66,37 +67,32 @@ impl TaskCollection {
     }
 
     pub fn validate_all(&self, verbose: bool) {
-        let mut failed = 0;
-        let mut total = 0;
-        let width_idx = self.width_idx();
+        let validator = Validator { verbose };
+        let mut all_reports = Vec::new();
 
-        for (idx, source, task) in self.all_tasks_with_source() {
-            if !source.validate_config(&task, idx, width_idx, verbose) {
-                failed += 1;
+        Validator::print_header();
+
+        for (_idx, source, task) in self.all_tasks_with_source() {
+            let report = validator.validate_task_command(task, source);
+
+            if verbose {
+                report.print(verbose);
+            } else {
+                report.print_compact();
             }
 
-            total += 1;
+            all_reports.push(report);
         }
 
-        if failed == 0 {
-            println!("✅ All {} tasks validated successfully!", total);
-        } else {
-            println!(
-                "❌ Validation failed for {} out of {} tasks!",
-                failed, total
-            );
-        }
+        Validator::print_summary(&all_reports);
     }
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
+        let validator = Validator { verbose };
         let (source, task) = self.find_task(idx)?;
-        let success = source.validate_config(&task, idx, self.width_idx(), verbose);
 
-        if success {
-            println!("✅ validation was successful");
-        } else {
-            println!("❌ validation failed");
-        }
+        let report = validator.validate_task_command(task, source);
+        report.print(verbose);
 
         Ok(())
     }

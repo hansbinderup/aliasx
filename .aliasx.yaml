@@ -16,6 +16,10 @@ tasks:
     command: "echo 'error: mapping: ${mapping:some-invalid-map}'"
   - label: "Task with mappings but no input"
     command: "echo 'input: NONE, mapping: ${mapping:picker}'"
+  - label: "Task with invalid input"
+    command: "echo 'error: input: ${input:some-invalid-input}'"
+  - label: "Task with partial mapping"
+    command: "echo 'error: input: ${mapping:misser}'"
 inputs:
   - id: some-int
     description: "just an int"
@@ -50,3 +54,7 @@ mappings:
       "types": "string type"
       42: "integer type"
       true: "boolean type"
+  - id: misser
+    input: some-int
+    options:
+      1: "only one mapped"
