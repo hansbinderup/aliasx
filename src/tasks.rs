@@ -101,41 +101,6 @@ impl Tasks {
 
         Ok(mapped_str)
     }
-
-    pub fn validate_config(
-        &self,
-        task: &TaskEntry,
-        idx: usize,
-        width_idx: usize,
-        verbose: bool,
-    ) -> bool {
-        /* validate inputs */
-        return Input::extract_variables(&task.command)
-            .iter()
-            .all(|var_id| match self.get_input(var_id) {
-                Ok(input) => {
-                    if verbose {
-                        println!("✅ [{:0>width_idx$}] input '{}' is defined", idx, input.id);
-                    }
-
-                    true
-                }
-                Err(_) => {
-                    println!(
-                        "❌ [{:0>width_idx$}] input '{}' not defined{}",
-                        idx,
-                        var_id,
-                        if verbose {
-                            format!(" | cmd: {}", task.command)
-                        } else {
-                            String::new()
-                        }
-                    );
-
-                    false
-                }
-            });
-    }
 }
 
 struct YamlTaskReader;
@@ -235,15 +200,20 @@ mod tests {
 
     #[test]
     fn test_validate_config_no_inputs() {
+        use crate::validator::Validator;
+
         let tasks = Tasks::default();
         let task = create_test_task("simple", "echo hello");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(!report.has_failures());
     }
 
     #[test]
     fn test_validate_config_valid_input() {
+        use crate::validator::Validator;
+
         let mut tasks = Tasks::default();
         tasks
             .inputs
@@ -251,21 +221,27 @@ mod tests {
 
         let task = create_test_task("deploy", "deploy ${input:env}");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(!report.has_failures());
     }
 
     #[test]
     fn test_validate_config_missing_input() {
+        use crate::validator::Validator;
+
         let tasks = Tasks::default();
         let task = create_test_task("deploy", "deploy ${input:missing}");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(!result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(report.has_failures());
     }
 
     #[test]
     fn test_validate_config_multiple_valid_inputs() {
+        use crate::validator::Validator;
+
         let mut tasks = Tasks::default();
         tasks
             .inputs
@@ -276,12 +252,15 @@ mod tests {
 
         let task = create_test_task("deploy", "deploy ${input:env} ${input:region}");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(!report.has_failures());
     }
 
     #[test]
     fn test_validate_config_multiple_inputs_one_missing() {
+        use crate::validator::Validator;
+
         let mut tasks = Tasks::default();
         tasks
             .inputs
@@ -289,12 +268,15 @@ mod tests {
 
         let task = create_test_task("deploy", "deploy ${input:env} ${input:missing}");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(!result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(report.has_failures());
     }
 
     #[test]
     fn test_validate_config_duplicate_input_references() {
+        use crate::validator::Validator;
+
         let mut tasks = Tasks::default();
         tasks
             .inputs
@@ -302,8 +284,9 @@ mod tests {
 
         let task = create_test_task("deploy", "deploy ${input:env} again ${input:env}");
 
-        let result = tasks.validate_config(&task, 0, 1, false);
-        assert!(result);
+        let validator = Validator { verbose: false };
+        let report = validator.validate_task_command(&task, &tasks);
+        assert!(!report.has_failures());
     }
 
     #[test]
