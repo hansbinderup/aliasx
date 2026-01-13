@@ -50,3 +50,8 @@ mappings:
       "types": "string type"
       42: "integer type"
       true: "boolean type"
+  - id: shouter2
+    input: some-int2
+    options:
+      1: "ONE!!"
+      3: "THREE!!"

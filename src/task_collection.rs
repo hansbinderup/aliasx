@@ -7,6 +7,7 @@ use std::process::Stdio;
 use crate::{
     input::Input,
     tasks::{TaskEntry, Tasks},
+    validator::{ValidationReport, Validator},
 };
 
 #[derive(Debug, Default)]
@@ -66,25 +67,17 @@ impl TaskCollection {
     }
 
     pub fn validate_all(&self, verbose: bool) {
-        let mut failed = 0;
-        let mut total = 0;
-        let width_idx = self.width_idx();
+        let validator = Validator { verbose };
 
         for (idx, source, task) in self.all_tasks_with_source() {
-            if !source.validate_config(&task, idx, width_idx, verbose) {
-                failed += 1;
+            let mut reports = Vec::new();
+            reports.push(validator.validate_task_command(task, source));
+
+            for report in reports.iter() {
+                for status in report.statuses.iter() {
+                    println!("  {}", status);
+                }
             }
-
-            total += 1;
-        }
-
-        if failed == 0 {
-            println!("✅ All {} tasks validated successfully!", total);
-        } else {
-            println!(
-                "❌ Validation failed for {} out of {} tasks!",
-                failed, total
-            );
         }
     }
 
