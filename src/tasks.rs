@@ -109,32 +109,84 @@ impl Tasks {
         width_idx: usize,
         verbose: bool,
     ) -> bool {
-        /* validate inputs */
-        return Input::extract_variables(&task.command)
+        let mut res = Input::extract_variables(&task.command)
             .iter()
-            .all(|var_id| match self.get_input(var_id) {
-                Ok(input) => {
+            .all(|var_id| self.validate_input(var_id, verbose, task, idx, width_idx));
+
+        res |= InputMapping::extract_from_str(&task.command)
+            .iter()
+            .all(|map_id| self.validate_input_mapping(map_id, verbose, task, idx, width_idx));
+
+        res
+    }
+
+    fn validate_input(
+        &self,
+        id: &str,
+        verbose: bool,
+        task: &TaskEntry,
+        idx: usize,
+        width_idx: usize,
+    ) -> bool {
+        return match self.get_input(id) {
+            Ok(input) => {
+                if verbose {
+                    println!("✅ [{:0>width_idx$}] input '{}' is defined", idx, input.id);
+                }
+
+                true
+            }
+            Err(_) => {
+                println!(
+                    "❌ [{:0>width_idx$}] input '{}' not defined{}",
+                    idx,
+                    id,
                     if verbose {
-                        println!("✅ [{:0>width_idx$}] input '{}' is defined", idx, input.id);
+                        format!(" | cmd: {}", task.command)
+                    } else {
+                        String::new()
                     }
+                );
 
-                    true
-                }
-                Err(_) => {
+                false
+            }
+        };
+    }
+
+    fn validate_input_mapping(
+        &self,
+        id: &str,
+        verbose: bool,
+        task: &TaskEntry,
+        idx: usize,
+        width_idx: usize,
+    ) -> bool {
+        return match self.get_mapping(id) {
+            Ok(mapping) => {
+                if verbose {
                     println!(
-                        "❌ [{:0>width_idx$}] input '{}' not defined{}",
-                        idx,
-                        var_id,
-                        if verbose {
-                            format!(" | cmd: {}", task.command)
-                        } else {
-                            String::new()
-                        }
+                        "✅ [{:0>width_idx$}] mapping '{}' is defined",
+                        idx, mapping.id
                     );
-
-                    false
                 }
-            });
+
+                true
+            }
+            Err(_) => {
+                println!(
+                    "❌ [{:0>width_idx$}] mapping '{}' not defined{}",
+                    idx,
+                    id,
+                    if verbose {
+                        format!(" | cmd: {}", task.command)
+                    } else {
+                        String::new()
+                    }
+                );
+
+                false
+            }
+        };
     }
 }
 
