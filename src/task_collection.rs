@@ -69,29 +69,41 @@ impl TaskCollection {
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
 
-        for (idx, source, task) in self.all_tasks_with_source() {
+        for (_idx, source, task) in self.all_tasks_with_source() {
             let mut reports = Vec::new();
             reports.push(validator.validate_task_command(task, source));
 
             for report in reports.iter() {
-                for status in report.statuses.iter() {
-                    println!("  {}", status);
-                }
+                self.print_validation_report(report, verbose);
             }
         }
     }
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
+        let validator = Validator { verbose };
         let (source, task) = self.find_task(idx)?;
-        let success = source.validate_config(&task, idx, self.width_idx(), verbose);
 
-        if success {
-            println!("✅ validation was successful");
-        } else {
-            println!("❌ validation failed");
-        }
+        let report = validator.validate_task_command(task, source);
+        self.print_validation_report(&report, verbose);
 
         Ok(())
+    }
+
+    fn print_validation_report(&self, report: &ValidationReport, verbose: bool) {
+        if verbose || !report.statuses.is_empty() {
+            println!(
+                "{}:{}",
+                report.validation_id,
+                match report.statuses.is_empty() {
+                    true => " ✅",
+                    false => "",
+                },
+            );
+        }
+
+        for status in report.statuses.iter() {
+            println!("  - {}", status);
+        }
     }
 
     pub fn list_at(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
