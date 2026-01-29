@@ -92,7 +92,10 @@ impl TaskCollection {
         let (source, task) = self.find_task(idx)?;
 
         let report = validator.validate_task_command(task, source);
-        report.print(verbose);
+
+        // for single tasks we need to print a verbose report
+        // otherwise there might be no output
+        report.print(true);
 
         Ok(())
     }
