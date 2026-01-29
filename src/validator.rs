@@ -1,5 +1,6 @@
 use crate::{
     input::Input,
+    input_mapping::InputMapping,
     tasks::{TaskEntry, Tasks},
 };
 use owo_colors::OwoColorize;
@@ -134,6 +135,7 @@ impl Validator {
         let mut report = ValidationReport::new(&entry.label);
 
         report.add_statuses(self.check_inputs(entry, source));
+        report.add_statuses(self.check_mappings(entry, source));
 
         report
     }
@@ -159,6 +161,63 @@ impl Validator {
         }
     }
 
+    fn check_mappings(&self, entry: &TaskEntry, source: &Tasks) -> Vec<ValidationStatus> {
+        InputMapping::extract_from_str(&entry.command)
+            .into_iter()
+            .flat_map(|mapping_id| self.check_mapping(&mapping_id, source))
+            .collect()
+    }
+
+    fn check_mapping(&self, mapping_id: &str, source: &Tasks) -> Vec<ValidationStatus> {
+        let mut statuses = Vec::new();
+
+        match source.get_mapping(mapping_id) {
+            Ok(mapping) => {
+                if self.verbose {
+                    statuses.push(ValidationStatus::pass(format!(
+                        "Mapping '{}' defined",
+                        mapping_id
+                    )));
+                }
+                statuses.extend(self.check_mapping_inputs(mapping, source));
+            }
+            Err(_) => {
+                statuses.push(ValidationStatus::fail(format!(
+                    "Mapping '{}' not defined",
+                    mapping_id
+                )));
+            }
+        }
+
+        statuses
+    }
+
+    // Ensure every option defined on the input has a corresponding entry in the mapping's options map.
+    fn check_mapping_inputs(
+        &self,
+        mapping: &InputMapping,
+        source: &Tasks,
+    ) -> Vec<ValidationStatus> {
+        match source.get_input(&mapping.input) {
+            Ok(input) => input
+                .options
+                .iter()
+                .filter(|option| !mapping.options.contains_key(*option))
+                .map(|option| {
+                    ValidationStatus::fail(format!(
+                        "Mapping '{}' doesn't define option for input '{}'",
+                        mapping.id, option
+                    ))
+                })
+                .collect(),
+            Err(_) => {
+                vec![ValidationStatus::fail(format!(
+                    "Mapping '{}' references undefined input '{}'",
+                    mapping.id, mapping.input
+                ))]
+            }
+        }
+    }
 
     pub fn print_header() {
         println!("{}", "═".repeat(60).dimmed());
