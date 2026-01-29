@@ -12,10 +12,12 @@ tasks:
     command: "echo input: ${input:some-int}, picker: ${mapping:picker}, shouter: ${mapping:shouter}"
   - label: "Task with multi input and mappings"
     command: "echo 'selected input: ${input:some-int} & ${input:mixed-types} which means: ${mapping:picker} & ${mapping:types}'"
-  - label: "Task with missing mappings"
-    command: "echo error: mapping: ${mapping:some-invalid-map}"
   - label: "Task with mappings but no input"
-    command: "echo input: NONE, mapping: ${mapping:picker}"
+    command: "echo 'input: NONE, mapping: ${mapping:picker}'"
+  - label: "Task with missing mappings"
+    command: "echo 'error: mapping: ${mapping:some-invalid-map} ${mapping:misser}'"
+  - label: "Task with invalid input"
+    command: "echo 'error: input: ${input:some-invalid-input}'"
 inputs:
   - id: some-int
     description: "just an int"
@@ -55,3 +57,7 @@ mappings:
     options:
       1: "ONE!!"
       3: "THREE!!"
+  - id: misser
+    input: some-int
+    options:
+      1: "only one mapped"

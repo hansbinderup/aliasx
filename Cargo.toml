@@ -9,6 +9,7 @@ clap = { version = "4.5.51", features = ["derive"] }
 execute = "0.2.13"
 fuzzy-select = "0.1.3"
 indexmap = { version="2.12.1", features = ["serde"] }
+owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 regex = "1.12.2"
 serde = { version="1.0.228", features = ["derive"] }
 serde_json5 = "0.2.1"

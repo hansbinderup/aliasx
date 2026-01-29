@@ -3,6 +3,7 @@ use crate::{
     input_mapping::InputMapping,
     tasks::{TaskEntry, Tasks},
 };
+use owo_colors::OwoColorize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationStatus {
@@ -33,8 +34,8 @@ impl ValidationStatus {
 
     pub fn format(&self) -> String {
         match self {
-            Self::Pass { message } => format!("✅ {}", message),
-            Self::Fail { message } => format!("❌ {}", message),
+            Self::Pass { message } => format!("{} {}", "✓".green().bold(), message.dimmed()),
+            Self::Fail { message } => format!("{} {}", "✗".red().bold(), message),
         }
     }
 }
@@ -67,6 +68,62 @@ impl ValidationReport {
     pub fn passes(&self) -> impl Iterator<Item = &ValidationStatus> {
         self.statuses.iter().filter(|s| s.is_pass())
     }
+
+    pub fn failure_count(&self) -> usize {
+        self.failures().count()
+    }
+
+    pub fn pass_count(&self) -> usize {
+        self.passes().count()
+    }
+
+    pub fn print(&self, verbose: bool) {
+        let fail_count = self.failure_count();
+        let total = self.statuses.len();
+
+        // Print header with task name and status badge
+        if verbose || fail_count > 0 {
+            let badge = if fail_count == 0 {
+                format!(" {}", "PASS".green().bold())
+            } else {
+                format!(
+                    " {} {}/{}",
+                    "FAIL".red().bold(),
+                    fail_count.red().bold(),
+                    total
+                )
+            };
+
+            println!("{}{}", self.validation_id.bold(), badge);
+
+            // Print details with indentation
+            if verbose || fail_count > 0 {
+                for status in &self.statuses {
+                    if verbose || status.is_fail() {
+                        println!("  {}", status.format());
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn print_compact(&self) {
+        let fail_count = self.failure_count();
+
+        if fail_count == 0 {
+            println!("{} {}", "✓".green().bold(), self.validation_id.dimmed());
+        } else {
+            println!(
+                "{} {} {}",
+                "✗".red().bold(),
+                self.validation_id,
+                format!("({} issues)", fail_count).red()
+            );
+            for status in self.failures() {
+                println!("    {}", status.format());
+            }
+        }
+    }
 }
 
 pub struct Validator {
@@ -86,30 +143,28 @@ impl Validator {
     fn check_inputs(&self, entry: &TaskEntry, source: &Tasks) -> Vec<ValidationStatus> {
         Input::extract_variables(&entry.command)
             .into_iter()
-            .filter_map(|input_id| {
-                self.check_input_defined(&input_id, source)
-            })
+            .filter_map(|input_id| self.check_input_defined(&input_id, source))
             .collect()
     }
 
     fn check_input_defined(&self, input_id: &str, source: &Tasks) -> Option<ValidationStatus> {
         match source.get_input(input_id) {
-            Ok(_) if self.verbose => {
-                Some(ValidationStatus::pass(format!("Input '{}' defined", input_id)))
-            }
+            Ok(_) if self.verbose => Some(ValidationStatus::pass(format!(
+                "Input '{}' defined",
+                input_id
+            ))),
             Ok(_) => None,
-            Err(_) => {
-                Some(ValidationStatus::fail(format!("Input '{}' not defined", input_id)))
-            }
+            Err(_) => Some(ValidationStatus::fail(format!(
+                "Input '{}' not defined",
+                input_id
+            ))),
         }
     }
 
     fn check_mappings(&self, entry: &TaskEntry, source: &Tasks) -> Vec<ValidationStatus> {
         InputMapping::extract_from_str(&entry.command)
             .into_iter()
-            .flat_map(|mapping_id| {
-                self.check_mapping(&mapping_id, source)
-            })
+            .flat_map(|mapping_id| self.check_mapping(&mapping_id, source))
             .collect()
     }
 
@@ -119,31 +174,41 @@ impl Validator {
         match source.get_mapping(mapping_id) {
             Ok(mapping) => {
                 if self.verbose {
-                    statuses.push(ValidationStatus::pass(format!("Mapping '{}' defined", mapping_id)));
+                    statuses.push(ValidationStatus::pass(format!(
+                        "Mapping '{}' defined",
+                        mapping_id
+                    )));
                 }
                 statuses.extend(self.check_mapping_inputs(mapping, source));
             }
             Err(_) => {
-                statuses.push(ValidationStatus::fail(format!("Mapping '{}' not defined", mapping_id)));
+                statuses.push(ValidationStatus::fail(format!(
+                    "Mapping '{}' not defined",
+                    mapping_id
+                )));
             }
         }
 
         statuses
     }
 
-    fn check_mapping_inputs(&self, mapping: &InputMapping, source: &Tasks) -> Vec<ValidationStatus> {
+    fn check_mapping_inputs(
+        &self,
+        mapping: &InputMapping,
+        source: &Tasks,
+    ) -> Vec<ValidationStatus> {
         match source.get_input(&mapping.input) {
-            Ok(input) => {
-                input.options.iter()
-                    .filter(|option| !mapping.options.contains_key(*option))
-                    .map(|option| {
-                        ValidationStatus::fail(format!(
-                            "Mapping '{}' doesn't define option for input '{}'",
-                            mapping.id, option
-                        ))
-                    })
-                    .collect()
-            }
+            Ok(input) => input
+                .options
+                .iter()
+                .filter(|option| !mapping.options.contains_key(*option))
+                .map(|option| {
+                    ValidationStatus::fail(format!(
+                        "Mapping '{}' doesn't define option for input '{}'",
+                        mapping.id, option
+                    ))
+                })
+                .collect(),
             Err(_) => {
                 vec![ValidationStatus::fail(format!(
                     "Mapping '{}' references undefined input '{}'",

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context};
 use execute::shell;
 use fuzzy_select::FuzzySelect;
 use indexmap::{IndexMap, IndexSet};
+use owo_colors::OwoColorize;
 use std::process::Stdio;
 
 use crate::{
@@ -68,15 +69,26 @@ impl TaskCollection {
 
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
+        let mut all_reports = Vec::new();
+
+        println!("{}", "═".repeat(60).dimmed());
+        println!("{}", "  VALIDATION REPORT".bold().cyan());
+        println!("{}\n", "═".repeat(60).dimmed());
 
         for (_idx, source, task) in self.all_tasks_with_source() {
-            let mut reports = Vec::new();
-            reports.push(validator.validate_task_command(task, source));
+            let report = validator.validate_task_command(task, source);
 
-            for report in reports.iter() {
-                self.print_validation_report(report, verbose);
+            if verbose {
+                report.print(verbose);
+            } else {
+                report.print_compact();
             }
+
+            all_reports.push(report);
         }
+
+        // Print summary
+        self.print_summary(&all_reports);
     }
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
@@ -84,25 +96,59 @@ impl TaskCollection {
         let (source, task) = self.find_task(idx)?;
 
         let report = validator.validate_task_command(task, source);
-        self.print_validation_report(&report, verbose);
+        report.print(verbose);
 
         Ok(())
     }
 
-    fn print_validation_report(&self, report: &ValidationReport, verbose: bool) {
-        if verbose || !report.statuses.is_empty() {
+    fn print_summary(&self, reports: &[ValidationReport]) {
+        let total_tasks = reports.len();
+        let failed_tasks = reports.iter().filter(|r| r.has_failures()).count();
+        let passed_tasks = total_tasks - failed_tasks;
+        let total_failures = reports.iter().map(|r| r.failure_count()).sum::<usize>();
+
+        println!("\n{}", "═".repeat(60).dimmed());
+        println!("{}", "  SUMMARY".bold().cyan());
+        println!("{}", "═".repeat(60).dimmed());
+
+        println!(
+            "  {} {}  {} {}",
+            "✓".green().bold(),
+            format!("{} passed", passed_tasks).green(),
+            if failed_tasks > 0 {
+                "✗".red().bold().to_string()
+            } else {
+                "".to_string()
+            },
+            if failed_tasks > 0 {
+                format!("{} failed", failed_tasks).red().to_string()
+            } else {
+                "".to_string()
+            }
+        );
+
+        if total_failures > 0 {
             println!(
-                "{}:{}",
-                report.validation_id,
-                match report.statuses.is_empty() {
-                    true => " ✅",
-                    false => "",
-                },
+                "  {} {} total",
+                "⚠".yellow().bold(),
+                format!("{} issues", total_failures).yellow()
             );
         }
 
-        for status in report.statuses.iter() {
-            println!("  - {}", status.format());
+        println!("{}", "═".repeat(60).dimmed());
+
+        if failed_tasks == 0 {
+            println!(
+                "\n{} {}\n",
+                "✓".green().bold(),
+                "All validations passed!".green().bold()
+            );
+        } else {
+            println!(
+                "\n{} {}\n",
+                "⚠".yellow().bold(),
+                "Some validations failed.".yellow().bold()
+            );
         }
     }
 
