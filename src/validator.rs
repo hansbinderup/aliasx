@@ -4,9 +4,69 @@ use crate::{
     tasks::{TaskEntry, Tasks},
 };
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationStatus {
+    Pass { message: String },
+    Fail { message: String },
+}
+
+impl ValidationStatus {
+    fn pass(message: impl Into<String>) -> Self {
+        Self::Pass {
+            message: message.into(),
+        }
+    }
+
+    fn fail(message: impl Into<String>) -> Self {
+        Self::Fail {
+            message: message.into(),
+        }
+    }
+
+    pub fn is_pass(&self) -> bool {
+        matches!(self, Self::Pass { .. })
+    }
+
+    pub fn is_fail(&self) -> bool {
+        matches!(self, Self::Fail { .. })
+    }
+
+    pub fn format(&self) -> String {
+        match self {
+            Self::Pass { message } => format!("✅ {}", message),
+            Self::Fail { message } => format!("❌ {}", message),
+        }
+    }
+}
+
 pub struct ValidationReport {
     pub validation_id: String,
-    pub statuses: Vec<String>,
+    pub statuses: Vec<ValidationStatus>,
+}
+
+impl ValidationReport {
+    fn new(validation_id: impl Into<String>) -> Self {
+        Self {
+            validation_id: validation_id.into(),
+            statuses: Vec::new(),
+        }
+    }
+
+    fn add_statuses(&mut self, statuses: impl IntoIterator<Item = ValidationStatus>) {
+        self.statuses.extend(statuses);
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.statuses.iter().any(ValidationStatus::is_fail)
+    }
+
+    pub fn failures(&self) -> impl Iterator<Item = &ValidationStatus> {
+        self.statuses.iter().filter(|s| s.is_fail())
+    }
+
+    pub fn passes(&self) -> impl Iterator<Item = &ValidationStatus> {
+        self.statuses.iter().filter(|s| s.is_pass())
+    }
 }
 
 pub struct Validator {
@@ -15,80 +75,80 @@ pub struct Validator {
 
 impl Validator {
     pub fn validate_task_command(&self, entry: &TaskEntry, source: &Tasks) -> ValidationReport {
-        let mut report = ValidationReport {
-            validation_id: entry.label.clone(),
-            statuses: Vec::new(),
-        };
+        let mut report = ValidationReport::new(&entry.label);
 
-        self.validate_inputs(&mut report, entry, source);
-        self.validate_mappings(&mut report, entry, source);
+        report.add_statuses(self.check_inputs(entry, source));
+        report.add_statuses(self.check_mappings(entry, source));
 
         report
     }
 
-    fn validate_inputs(&self, report: &mut ValidationReport, entry: &TaskEntry, source: &Tasks) {
+    fn check_inputs(&self, entry: &TaskEntry, source: &Tasks) -> Vec<ValidationStatus> {
         Input::extract_variables(&entry.command)
-            .iter()
-            .for_each(|input_id| match source.get_input(input_id) {
-                Ok(_) => {
-                    if self.verbose {
-                        report
-                            .statuses
-                            .push(format!("✅ Input '{}' defined", input_id));
-                    }
-                }
-                Err(_) => {
-                    report
-                        .statuses
-                        .push(format!("❌ Input '{}' not defined", input_id));
-                }
-            });
+            .into_iter()
+            .filter_map(|input_id| {
+                self.check_input_defined(&input_id, source)
+            })
+            .collect()
     }
 
-    fn validate_mappings(&self, report: &mut ValidationReport, entry: &TaskEntry, source: &Tasks) {
+    fn check_input_defined(&self, input_id: &str, source: &Tasks) -> Option<ValidationStatus> {
+        match source.get_input(input_id) {
+            Ok(_) if self.verbose => {
+                Some(ValidationStatus::pass(format!("Input '{}' defined", input_id)))
+            }
+            Ok(_) => None,
+            Err(_) => {
+                Some(ValidationStatus::fail(format!("Input '{}' not defined", input_id)))
+            }
+        }
+    }
+
+    fn check_mappings(&self, entry: &TaskEntry, source: &Tasks) -> Vec<ValidationStatus> {
         InputMapping::extract_from_str(&entry.command)
-            .iter()
-            .for_each(|mapping_id| match source.get_mapping(mapping_id) {
-                Ok(mapping) => {
-                    if self.verbose {
-                        report
-                            .statuses
-                            .push(format!("✅ Mapping '{}' defined", mapping_id));
-                    }
-
-                    self.validate_mapping_inputs(report, mapping, source);
-                }
-                Err(_) => {
-                    report
-                        .statuses
-                        .push(format!("❌ Mapping '{}' not defined", mapping_id));
-                }
-            });
+            .into_iter()
+            .flat_map(|mapping_id| {
+                self.check_mapping(&mapping_id, source)
+            })
+            .collect()
     }
 
-    // cross check mapping options against input options
-    fn validate_mapping_inputs(
-        &self,
-        report: &mut ValidationReport,
-        mapping: &InputMapping,
-        source: &Tasks,
-    ) {
-        match source.get_input(&mapping.input) {
-            Ok(input) => {
-                for option in input.options.iter() {
-                    if !mapping.options.contains_key(option) {
-                        report.statuses.push(format!(
-                            "❌ Mapping '{}' doesn't define option for input '{}'",
-                            mapping.id, option
-                        ));
-                    }
+    fn check_mapping(&self, mapping_id: &str, source: &Tasks) -> Vec<ValidationStatus> {
+        let mut statuses = Vec::new();
+
+        match source.get_mapping(mapping_id) {
+            Ok(mapping) => {
+                if self.verbose {
+                    statuses.push(ValidationStatus::pass(format!("Mapping '{}' defined", mapping_id)));
                 }
+                statuses.extend(self.check_mapping_inputs(mapping, source));
             }
             Err(_) => {
-                report.statuses.push(format!(
-                    "❌ Mapping '{}' references undefined input '{}'",
+                statuses.push(ValidationStatus::fail(format!("Mapping '{}' not defined", mapping_id)));
+            }
+        }
+
+        statuses
+    }
+
+    fn check_mapping_inputs(&self, mapping: &InputMapping, source: &Tasks) -> Vec<ValidationStatus> {
+        match source.get_input(&mapping.input) {
+            Ok(input) => {
+                input.options.iter()
+                    .filter(|option| !mapping.options.contains_key(*option))
+                    .map(|option| {
+                        ValidationStatus::fail(format!(
+                            "Mapping '{}' doesn't define option for input '{}'",
+                            mapping.id, option
+                        ))
+                    })
+                    .collect()
+            }
+            Err(_) => {
+                vec![ValidationStatus::fail(format!(
+                    "Mapping '{}' references undefined input '{}'",
                     mapping.id, mapping.input
-                ));
+                ))]
             }
         }
     }

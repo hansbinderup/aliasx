@@ -102,7 +102,7 @@ impl TaskCollection {
         }
 
         for status in report.statuses.iter() {
-            println!("  - {}", status);
+            println!("  - {}", status.format());
         }
     }
 
