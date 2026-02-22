@@ -1,10 +1,12 @@
 use std::str::FromStr;
 
 use clap::{Parser, Subcommand};
+use indexmap::IndexMap;
 
 use aliasx_core::{
-    aliases, task_filter::TaskFilter, tasks::{self}
+    aliases, task_filter::TaskFilter, tasks::{self, TaskEntry}
 };
+use aliasx_tui::{string_fuzzy_finder, string_fuzzy_finder_with, task_fuzzy_finder, TuiSession};
 
 #[derive(Parser)]
 #[command(
@@ -83,7 +85,7 @@ pub fn run() -> anyhow::Result<()> {
         }
 
         Some(Commands::Fzf { query }) => {
-            tasks.fzf(query.as_deref().unwrap_or(""), cli.verbose)?;
+            run_fzf(&tasks, query.as_deref().unwrap_or(""), cli.verbose)?;
         }
 
         Some(Commands::Validate) => {
@@ -96,15 +98,48 @@ pub fn run() -> anyhow::Result<()> {
 
         None => {
             if index.is_none() {
-                tasks.fzf("", cli.verbose)?;
+                run_fzf(&tasks, "", cli.verbose)?;
                 return Ok(());
             }
 
-            tasks.execute(index.unwrap(), cli.verbose)?;
+            let idx = index.unwrap();
+            let mut selections = IndexMap::new();
+            for input in tasks.required_inputs_for_task(idx)? {
+                let prompt = format!(
+                    "input | {}:",
+                    input.description.as_deref().unwrap_or(&input.id)
+                );
+                let (_, val) = string_fuzzy_finder(&input.options, &prompt, "", input.get_default_selection())?;
+                selections.insert(input.id.clone(), val);
+            }
+            tasks.execute(idx, selections, cli.verbose)?;
         }
     }
 
     Ok(())
+}
+
+fn run_fzf(tasks: &aliasx_core::task_collection::TaskCollection, query: &str, verbose: bool) -> anyhow::Result<()> {
+    let indexed = tasks.indexed_tasks();
+    let entries: Vec<(usize, TaskFilter, &TaskEntry)> = indexed.iter().map(|(id, scope, t)| (*id, *scope, *t)).collect();
+
+    let mut session = TuiSession::new()?;
+    let selected_id = task_fuzzy_finder(&entries, &tasks, &mut session, query, verbose)?;
+
+    let inputs = tasks.required_inputs_for_task(selected_id)?;
+    let mut selections = IndexMap::new();
+
+    for input in inputs {
+        let prompt = format!(
+            "input | {}:",
+            input.description.as_deref().unwrap_or(&input.id)
+        );
+        let (_, val) = string_fuzzy_finder_with(&input.options, &prompt, "", input.get_default_selection(), &mut session)?;
+        selections.insert(input.id.clone(), val);
+    }
+
+    drop(session);
+    tasks.execute(selected_id, selections, verbose)
 }
 
 // TODO: add mocks to verify calls

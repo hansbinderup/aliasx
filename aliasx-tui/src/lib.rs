@@ -1,8 +1,9 @@
-use ratatui::prelude::*;
-use anyhow::Result;
+mod fuzzy;
+mod session;
+mod task_fuzzy;
+mod widgets;
 
-pub fn fuzzy_select(options: &[String], prompt: &str) -> Result<String> {
-    // Placeholder: implement ratatui fuzzy finder here
-    // For now, just return the first option
-    options.get(0).cloned().ok_or_else(|| anyhow::anyhow!("No options provided"))
-}
+pub use fuzzy::{string_fuzzy_finder, string_fuzzy_finder_with};
+pub use session::TuiSession;
+pub use task_fuzzy::task_fuzzy_finder;
+

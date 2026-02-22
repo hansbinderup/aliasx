@@ -13,18 +13,19 @@ dependencies = [
 
 [[package]]
 name = "aliasx-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aliasx-core",
+ "aliasx-tui",
  "anyhow",
  "clap",
+ "indexmap",
 ]
 
 [[package]]
 name = "aliasx-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
- "aliasx-tui",
  "anyhow",
  "execute",
  "indexmap",
@@ -38,9 +39,11 @@ dependencies = [
 
 [[package]]
 name = "aliasx-tui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
+ "aliasx-core",
  "anyhow",
+ "crossterm",
  "ratatui",
 ]
 
