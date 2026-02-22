@@ -8,6 +8,12 @@ pub enum TaskFilter {
     Global,
 }
 
+impl Default for TaskFilter {
+    fn default() -> Self {
+        TaskFilter::Local
+    }
+}
+
 impl TaskFilter {
     pub fn include_local(self) -> bool {
         matches!(self, TaskFilter::All | TaskFilter::Local)

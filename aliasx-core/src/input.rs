@@ -30,26 +30,14 @@ impl Input {
         REPLACE_REGEX.replace(s, replacement).to_string()
     }
 
-    fn get_default_selection(&self) -> u32 {
+    pub fn get_default_selection(&self) -> usize {
         self.default
             .as_deref()
             .and_then(|d| self.options.iter().position(|opt| opt == d))
-            .unwrap_or(0) as u32
+            .unwrap_or(0)
     }
 
-    pub fn fzf(&self) -> anyhow::Result<String> {
-        let prompt = format!(
-            "input | {}:",
-            self.description.as_deref().unwrap_or(&self.id)
-        );
 
-        // Show fuzzy picker and get selection index
-        // TODO: Replace with aliasx-tui fuzzy_select
-        let selection = self.options.get(self.get_default_selection() as usize)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("No options provided"))?;
-        Ok(selection)
-    }
 }
 
 #[cfg(test)]

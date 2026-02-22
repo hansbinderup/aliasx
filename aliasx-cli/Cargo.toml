@@ -1,9 +1,11 @@
 [package]
 name = "aliasx-cli"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 aliasx-core = { path = "../aliasx-core" }
+aliasx-tui = { path = "../aliasx-tui" }
 clap = { version = "4.5.51", features = ["derive"] }
 anyhow = "1.0.100"
+indexmap = "2.12.1"

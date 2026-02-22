@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context};
 use execute::shell;
-use aliasx_tui::fuzzy_select;
 use indexmap::{IndexMap, IndexSet};
 use std::process::Stdio;
 
@@ -9,6 +8,7 @@ use crate::{
     tasks::{TaskEntry, Tasks},
     validator::Validator,
 };
+use crate::task_filter::TaskFilter;
 
 #[derive(Debug, Default)]
 pub struct TaskCollection {
@@ -24,7 +24,7 @@ impl TaskCollection {
         self.sources.iter().map(|t| t.tasks.len()).sum()
     }
 
-    fn width_idx(&self) -> usize {
+    pub fn width_idx(&self) -> usize {
         self.total_count().to_string().len()
     }
 
@@ -64,6 +64,25 @@ impl TaskCollection {
         }
 
         Err(anyhow!("invalid index '{}'", id))
+    }
+
+    /// Returns all tasks as `(global_index, scope, &TaskEntry)`, deduplicated.
+    /// NOTE: indexSet does not support standard slices so therefore the vector..
+    pub fn indexed_tasks(&self) -> Vec<(usize, TaskFilter, &TaskEntry)> {
+        let mut seen: IndexSet<&TaskEntry> = IndexSet::new();
+        let mut result = Vec::new();
+        for (idx, source, task) in self.all_tasks_with_source() {
+            if seen.insert(task) {
+                result.push((idx, source.scope, task));
+            }
+        }
+        result
+    }
+
+    /// Returns the inputs required to execute task `id` (direct + via mappings).
+    pub fn required_inputs_for_task(&self, id: usize) -> anyhow::Result<Vec<&Input>> {
+        let (task_set, task) = self.find_task(id)?;
+        task_set.required_inputs_for_command(&task.command)
     }
 
     pub fn validate_all(&self, verbose: bool) {
@@ -115,46 +134,30 @@ impl TaskCollection {
         Ok(())
     }
 
-    pub fn fzf(&self, query: &str, verbose: bool) -> anyhow::Result<()> {
-        let width = self.width_idx();
-
-        // Build IndexSet of display strings directly, avoiding intermediate collections
-        let task_strings: IndexSet<String> = self
-            .all_tasks()
-            .iter()
-            .enumerate()
-            .map(|(i, task)| format!("[{:0>width$}] {}", i, task.format(verbose)))
-            .collect();
-
-        let task_slice: Vec<String> = task_strings.iter().map(|s| s.clone()).collect();
-        let selection = fuzzy_select(&task_slice, "Search:")?;
-
-        let id = task_strings
-            .get_index_of(&selection)
-            .ok_or_else(|| anyhow!("Selected task not found"))?;
-
-        self.execute(id, verbose)?;
-
-        Ok(())
-    }
-
-    pub fn execute(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
+    /// Execute task `id` with pre-collected `input_selections`.
+    pub fn execute(&self, id: usize, input_selections: IndexMap<String, String>, verbose: bool) -> anyhow::Result<()> {
         let (task_set, task) = self.find_task(id)?;
-        let inputs = Input::extract_variables(&task.command);
-        let mut input_selections = IndexMap::new();
 
         let mut task_command = task.command.clone();
 
-        for input_id in inputs.iter() {
-            let input = task_set.get_input(input_id)?;
-            let selected_input = input.fzf()?;
-
-            input_selections.insert(input_id.clone(), selected_input.clone());
-            task_command = Input::replace_next_variable(&task_command, &selected_input);
+        for input_id in Input::extract_variables(&task.command) {
+            let val = input_selections
+                .get(&input_id)
+                .ok_or_else(|| anyhow!("no selection provided for input '{}'", input_id))?;
+            task_command = Input::replace_next_variable(&task_command, val);
         }
 
-        task_command = task_set.apply_mappings(&task_command, &mut input_selections)?;
+        task_command = task_set.apply_mappings(&task_command, &input_selections)?;
 
+        self.run_command(task, task_command, verbose)
+    }
+
+    fn run_command(
+        &self,
+        task: &TaskEntry,
+        task_command: String,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         println!("aliasx | {}\n", task.format(verbose));
 
         let mut cmd = shell(&task_command);

@@ -24,6 +24,9 @@ pub struct Tasks {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mappings: Vec<InputMapping>,
+
+    #[serde(skip)]
+    pub scope: TaskFilter,
 }
 
 impl TaskEntry {
@@ -63,10 +66,27 @@ impl Tasks {
             .ok_or_else(|| anyhow!("mapping with id '{}' not found", id))
     }
 
+    /// Returns all inputs required to execute `command`, including those
+    /// referenced indirectly through mappings.
+    pub fn required_inputs_for_command(&self, command: &str) -> anyhow::Result<Vec<&Input>> {
+        let mut ids: IndexSet<String> = IndexSet::new();
+
+        for id in Input::extract_variables(command) {
+            ids.insert(id);
+        }
+
+        for map_id in InputMapping::extract_from_str(command) {
+            let mapping = self.get_mapping(&map_id)?;
+            ids.insert(mapping.input.clone());
+        }
+
+        ids.iter().map(|id| self.get_input(id)).collect()
+    }
+
     pub fn apply_mappings(
         &self,
         command: &str,
-        input_selections: &mut IndexMap<String, String>,
+        input_selections: &IndexMap<String, String>,
     ) -> anyhow::Result<String> {
         let mapping_strings = InputMapping::extract_from_str(command);
         let mut mapped_str = command.to_string();
@@ -75,14 +95,6 @@ impl Tasks {
             let input_mapping = self.get_mapping(&map_str)?;
             let key = &input_mapping.input;
 
-            /* if input is not already selected, prompt for it */
-            if !input_selections.contains_key(key) {
-                let fzf_selection = self.get_input(key)?.fzf()?;
-                input_selections.insert(key.clone(), fzf_selection);
-            }
-
-            /* we could unwrap here since we just inserted it if it was missing
-             *  but let's be pragmatic with user warnings/errors */
             let sel_value = input_selections
                 .get(key)
                 .ok_or_else(|| anyhow!("no selection found for input '{}'", key))?;
@@ -144,7 +156,9 @@ pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
     }
 
     if filter.include_global() && global_path.is_file() {
-        sources.push(YamlTaskReader::parse_file(global_path)?);
+        let mut global = YamlTaskReader::parse_file(global_path)?;
+        global.scope = TaskFilter::Global;
+        sources.push(global);
     }
 
     Ok(TaskCollection::new(sources))
