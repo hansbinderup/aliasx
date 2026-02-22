@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use execute::shell;
-use fuzzy_select::FuzzySelect;
+use aliasx_tui::fuzzy_select;
 use indexmap::{IndexMap, IndexSet};
 use std::process::Stdio;
 
@@ -126,14 +126,11 @@ impl TaskCollection {
             .map(|(i, task)| format!("[{:0>width$}] {}", i, task.format(verbose)))
             .collect();
 
-        let selection = FuzzySelect::new()
-            .with_prompt("Search:")
-            .with_query(query)
-            .with_options(task_strings.iter().map(|s| s.as_str()).collect::<Vec<_>>())
-            .select()?;
+        let task_slice: Vec<String> = task_strings.iter().map(|s| s.clone()).collect();
+        let selection = fuzzy_select(&task_slice, "Search:")?;
 
         let id = task_strings
-            .get_index_of(selection)
+            .get_index_of(&selection)
             .ok_or_else(|| anyhow!("Selected task not found"))?;
 
         self.execute(id, verbose)?;

@@ -1,6 +1,5 @@
 use std::sync::LazyLock;
 
-use fuzzy_select::FuzzySelect;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -45,12 +44,10 @@ impl Input {
         );
 
         // Show fuzzy picker and get selection index
-        let selection = FuzzySelect::new()
-            .with_prompt(prompt)
-            .with_options(self.options.clone())
-            .with_initial_selection(self.get_default_selection())
-            .select()?;
-
+        // TODO: Replace with aliasx-tui fuzzy_select
+        let selection = self.options.get(self.get_default_selection() as usize)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No options provided"))?;
         Ok(selection)
     }
 }
