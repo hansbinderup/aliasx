@@ -2,4 +2,4 @@
 members = [
     "aliasx-core",
     "aliasx-cli"
-]
+, "aliasx-tui"]
