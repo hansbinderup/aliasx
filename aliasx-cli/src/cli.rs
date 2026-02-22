@@ -1,8 +1,9 @@
+use std::str::FromStr;
+
 use clap::{Parser, Subcommand};
 
-use crate::{
-    aliases,
-    tasks::{self, TaskFilter},
+use aliasx_core::{
+    aliases, task_filter::TaskFilter, tasks::{self}
 };
 
 #[derive(Parser)]
@@ -39,7 +40,7 @@ struct Cli {
     verbose: bool,
 
     /// filter which tasks to include
-    #[arg(short, long, default_value_t = TaskFilter::All)]
+    #[arg(short, long, value_parser = TaskFilter::from_str, default_value_t = TaskFilter::All)]
     filter: TaskFilter,
 }
 

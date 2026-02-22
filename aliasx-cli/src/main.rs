@@ -1,10 +1,4 @@
-pub mod aliases;
-mod cli;
-pub mod input;
-pub mod input_mapping;
-pub mod task_collection;
-pub mod tasks;
-pub mod validator;
+use aliasx_cli::cli;
 
 fn main() {
     cli::run().unwrap_or_else(|err| {
