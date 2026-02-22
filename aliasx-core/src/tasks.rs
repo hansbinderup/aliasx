@@ -1,13 +1,12 @@
 use anyhow::anyhow;
-use clap::ValueEnum;
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::path::Path;
 
 use crate::input::Input;
 use crate::input_mapping::InputMapping;
 use crate::task_collection::TaskCollection;
+use crate::task_filter::TaskFilter;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
@@ -126,33 +125,6 @@ impl TaskReader for JsonTaskReader {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum TaskFilter {
-    All,
-    Local,
-    Global,
-}
-
-impl TaskFilter {
-    pub fn include_local(self) -> bool {
-        matches!(self, TaskFilter::All | TaskFilter::Local)
-    }
-
-    pub fn include_global(self) -> bool {
-        matches!(self, TaskFilter::All | TaskFilter::Global)
-    }
-}
-
-impl fmt::Display for TaskFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            TaskFilter::All => "all",
-            TaskFilter::Local => "local",
-            TaskFilter::Global => "global",
-        };
-        write!(f, "{}", s)
-    }
-}
 
 pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
@@ -338,19 +310,5 @@ mod tests {
     fn test_task_entry_format_non_verbose() {
         let task = create_test_task("test-task", "echo hello");
         assert_eq!(task.format(false), "test-task");
-    }
-
-    #[test]
-    fn test_task_filter_include_local() {
-        assert!(TaskFilter::All.include_local());
-        assert!(TaskFilter::Local.include_local());
-        assert!(!TaskFilter::Global.include_local());
-    }
-
-    #[test]
-    fn test_task_filter_include_global() {
-        assert!(TaskFilter::All.include_global());
-        assert!(!TaskFilter::Local.include_global());
-        assert!(TaskFilter::Global.include_global());
     }
 }

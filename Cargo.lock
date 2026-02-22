@@ -12,11 +12,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "aliasx"
-version = "0.1.9"
+name = "aliasx-cli"
+version = "0.1.0"
 dependencies = [
+ "aliasx-core",
  "anyhow",
  "clap",
+]
+
+[[package]]
+name = "aliasx-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "execute",
  "fuzzy-select",
  "indexmap",
