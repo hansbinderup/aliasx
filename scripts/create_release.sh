@@ -15,10 +15,10 @@ rm -rf "$BUILD_DIR" || true
 mkdir -p "$BUILD_DIR"
 
 # Build release from scratch
-cargo build --release --locked --verbose --target-dir "$BUILD_DIR"
+cargo build --release --locked --target-dir "$BUILD_DIR"
 
 # Copy binaries (or files) to release folder
-cp "$BUILD_DIR/release/aliasx" "$RELEASE_DIR/aliasx-$VERSION"
+cp "$BUILD_DIR/release/aliasx-cli" "$RELEASE_DIR/aliasx-$VERSION"
 
 # Create tarball with all builds
 pushd "$RELEASE_DIR"

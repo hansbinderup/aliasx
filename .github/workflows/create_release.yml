@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0 # include tags
       - name: Get Cargo version
         run: |
-          VERSION=$(cargo pkgid | sed 's/.*#//')
+          VERSION=$(cargo pkgid -p aliasx-cli | sed 's/.*#//')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Check if tag exists
         run: |
