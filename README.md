@@ -2,15 +2,9 @@
 
 **Alias e(x)tended** – a CLI tool to manage tasks, aliases, and build handles efficiently.
 
-## Demo
-
-<p align="center">
-  <img src="docs/example.gif" width="700">
-</p>
-
-(see [`.aliasx.yaml`](.aliasx.yaml) for documentation of the tasks in the demo)
-
 ## Features
+
+For full feature set see the [documentation](docs/README.md)
 
 - Lightweight and fast command-line interface
 - Task and alias management
@@ -25,6 +19,19 @@
 - Fully support all parameters in the vscode tasks
 - Support variable inputs
     - instead of fixed input types also support manually inputting a variable
+- Convert vscode.json file to aliasx.yaml syntax
+- Conditionals - only enable tasks given some constraints
+- Depends on - trigger other tasks before running this one
+- Create base config - prompt aliasx to create some "boiler plate configs"
+
+## Demo
+
+<p align="center">
+  <img src="docs/gifs/frontpage_example.gif" width="700">
+</p>
+
+(see [`.aliasx.yaml`](.aliasx.yaml) for documentation of the tasks in the demo)
+
 
 ## Installation
 
