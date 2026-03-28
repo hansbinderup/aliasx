@@ -20,7 +20,6 @@ For full feature set see the [documentation](docs/README.md)
 - Support variable inputs
     - instead of fixed input types also support manually inputting a variable
 - Convert vscode.json file to aliasx.yaml syntax
-- Conditionals - only enable tasks given some constraints
 - Depends on - trigger other tasks before running this one
 - Create base config - prompt aliasx to create some "boiler plate configs"
 

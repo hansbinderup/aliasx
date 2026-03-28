@@ -20,6 +20,23 @@ tasks:
     command: "echo 'error: input: ${input:some-invalid-input}'"
   - label: "Task with partial mapping"
     command: "echo 'error: input: ${mapping:misser}'"
+  - label: "Should not be shown!"
+    command: "echo  'conditions should not be true!'"
+    conditions:
+      paths:
+        - "something-invalid"
+      files:
+        - "FILE_THAT_DOES_NOT_EXIST"
+  - label: "Git status"
+    command: "git status"
+    description: "Get git status when .git dir exists or when in any 'repos/github' sub-folder"
+    conditions:
+      files:
+        - ".git"
+      paths:
+        - "**/repos/**"
+        - "/home/user/github/**"
+
 inputs:
   - id: some-int
     description: "just an int"

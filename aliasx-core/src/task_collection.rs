@@ -190,6 +190,7 @@ mod tests {
         TaskEntry {
             label: label.to_string(),
             command: command.to_string(),
+            conditions: Option::None,
         }
     }
 

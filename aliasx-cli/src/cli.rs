@@ -68,11 +68,12 @@ enum Commands {
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let index = &cli.index;
+    let enable_conditions = !matches!(cli.command, Some(Commands::Validate));
 
     let tasks = if cli.native {
         aliases::get_aliases_as_tasks()?
     } else {
-        tasks::get_all_tasks(cli.filter)?
+        tasks::get_all_tasks(cli.filter, enable_conditions)?
     };
 
     match &cli.command {

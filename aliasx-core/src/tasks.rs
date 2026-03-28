@@ -6,12 +6,14 @@ use std::path::Path;
 use crate::input::Input;
 use crate::input_mapping::InputMapping;
 use crate::task_collection::TaskCollection;
+use crate::task_conditions::TaskCondition;
 use crate::task_filter::TaskFilter;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
     pub label: String,
     pub command: String,
+    pub conditions: Option<TaskCondition>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -44,6 +46,16 @@ impl TaskEntry {
 }
 
 impl Tasks {
+    pub fn apply_conditions(&mut self) {
+        self.tasks.retain(|t| {
+            if let Some(c) = &t.conditions {
+                c.is_valid()
+            } else {
+                true
+            }
+        });
+    }
+
     pub fn get_input(&self, id: &str) -> anyhow::Result<&Input> {
         if self.inputs.is_empty() {
             return Err(anyhow!("no inputs defined"));
@@ -137,8 +149,7 @@ impl TaskReader for JsonTaskReader {
     }
 }
 
-
-pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
+pub fn get_all_tasks(filter: TaskFilter, apply_conditions: bool) -> anyhow::Result<TaskCollection> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
     let local_vscode_tasks = Path::new(".vscode/tasks.json");
 
@@ -161,6 +172,12 @@ pub fn get_all_tasks(filter: TaskFilter) -> anyhow::Result<TaskCollection> {
         sources.push(global);
     }
 
+    if apply_conditions {
+        for source in sources.iter_mut() {
+            source.apply_conditions();
+        }
+    }
+
     Ok(TaskCollection::new(sources))
 }
 
@@ -172,6 +189,7 @@ mod tests {
         TaskEntry {
             label: label.to_string(),
             command: command.to_string(),
+            conditions: Option::None,
         }
     }
 
