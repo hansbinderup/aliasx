@@ -75,6 +75,23 @@ impl TaskCondition {
 
         false
     }
+
+    // for simplicity - just return the first error if any
+    pub fn validate(&self) -> Option<String> {
+        for file in self.files.iter() {
+            if let Err(_) = Glob::new(file) {
+                return Some(format!("files: {}", file.clone()));
+            }
+        }
+
+        for path in self.paths.iter() {
+            if let Err(_) = Glob::new(path) {
+                return Some(format!("paths: {}", path.clone()));
+            }
+        }
+
+        Option::None
+    }
 }
 
 #[cfg(test)]

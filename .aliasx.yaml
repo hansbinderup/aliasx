@@ -27,6 +27,7 @@ tasks:
         - "something-invalid"
       files:
         - "FILE_THAT_DOES_NOT_EXIST"
+        - "[invalidglob"
   - label: "Git status"
     command: "git status"
     description: "Get git status when .git dir exists or when in any 'repos/github' sub-folder"
