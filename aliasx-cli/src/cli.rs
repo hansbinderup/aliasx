@@ -4,7 +4,9 @@ use clap::{Parser, Subcommand};
 use indexmap::IndexMap;
 
 use aliasx_core::{
-    aliases, task_filter::TaskFilter, tasks::{self, TaskEntry}
+    aliases,
+    task_filter::TaskFilter,
+    tasks::{self, TaskEntry},
 };
 use aliasx_tui::{string_fuzzy_finder, string_fuzzy_finder_with, task_fuzzy_finder, TuiSession};
 
@@ -44,6 +46,10 @@ struct Cli {
     /// filter which tasks to include
     #[arg(short, long, value_parser = TaskFilter::from_str, default_value_t = TaskFilter::All)]
     filter: TaskFilter,
+
+    /// enable conditions
+    #[arg(short, long)]
+    conditions: Option<bool>,
 }
 
 #[derive(Subcommand)]
@@ -68,7 +74,10 @@ enum Commands {
 pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let index = &cli.index;
-    let enable_conditions = !matches!(cli.command, Some(Commands::Validate));
+
+    // default to enable conditions - but always disable when validating
+    let enable_conditions =
+        cli.conditions.unwrap_or(true) && !matches!(cli.command, Some(Commands::Validate));
 
     let tasks = if cli.native {
         aliases::get_aliases_as_tasks()?
@@ -110,7 +119,12 @@ pub fn run() -> anyhow::Result<()> {
                     "input | {}:",
                     input.description.as_deref().unwrap_or(&input.id)
                 );
-                let (_, val) = string_fuzzy_finder(&input.options, &prompt, "", input.get_default_selection())?;
+                let (_, val) = string_fuzzy_finder(
+                    &input.options,
+                    &prompt,
+                    "",
+                    input.get_default_selection(),
+                )?;
                 selections.insert(input.id.clone(), val);
             }
             tasks.execute(idx, selections, cli.verbose)?;
@@ -120,9 +134,16 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_fzf(tasks: &aliasx_core::task_collection::TaskCollection, query: &str, verbose: bool) -> anyhow::Result<()> {
+fn run_fzf(
+    tasks: &aliasx_core::task_collection::TaskCollection,
+    query: &str,
+    verbose: bool,
+) -> anyhow::Result<()> {
     let indexed = tasks.indexed_tasks();
-    let entries: Vec<(usize, TaskFilter, &TaskEntry)> = indexed.iter().map(|(id, scope, t)| (*id, *scope, *t)).collect();
+    let entries: Vec<(usize, TaskFilter, &TaskEntry)> = indexed
+        .iter()
+        .map(|(id, scope, t)| (*id, *scope, *t))
+        .collect();
 
     let mut session = TuiSession::new()?;
     let selected_id = task_fuzzy_finder(&entries, &tasks, &mut session, query, verbose)?;
@@ -135,7 +156,13 @@ fn run_fzf(tasks: &aliasx_core::task_collection::TaskCollection, query: &str, ve
             "input | {}:",
             input.description.as_deref().unwrap_or(&input.id)
         );
-        let (_, val) = string_fuzzy_finder_with(&input.options, &prompt, "", input.get_default_selection(), &mut session)?;
+        let (_, val) = string_fuzzy_finder_with(
+            &input.options,
+            &prompt,
+            "",
+            input.get_default_selection(),
+            &mut session,
+        )?;
         selections.insert(input.id.clone(), val);
     }
 
