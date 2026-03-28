@@ -1,6 +1,5 @@
-use anyhow::Result;
-use execute::Execute;
-use std::process::{Command, Stdio};
+use anyhow::{Context, Result};
+use std::process::Stdio;
 
 use crate::task_collection::TaskCollection;
 use crate::tasks::{TaskEntry, Tasks};
@@ -27,11 +26,11 @@ fn parse_aliases(output: &str) -> Result<Tasks> {
 pub fn get_aliases_as_tasks() -> anyhow::Result<TaskCollection> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
 
-    let mut command = Command::new(shell);
-    command.args(["-ic", "alias"]);
-    command.stdout(Stdio::piped());
-
-    let output = command.execute_output()?;
+    let output = std::process::Command::new(shell)
+        .args(["-ic", "alias"])
+        .stdout(Stdio::piped())
+        .output()
+        .context("failed to execute alias command")?;
 
     match output.status.code() {
         Some(0) => {}

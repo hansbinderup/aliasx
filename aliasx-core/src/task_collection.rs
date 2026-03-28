@@ -1,14 +1,12 @@
-use anyhow::{anyhow, Context};
-use execute::shell;
+use anyhow::anyhow;
 use indexmap::{IndexMap, IndexSet};
-use std::process::Stdio;
-
+use crate::executor::Executor;
+use crate::task_filter::TaskFilter;
 use crate::{
     input::Input,
     tasks::{TaskEntry, Tasks},
     validator::Validator,
 };
-use crate::task_filter::TaskFilter;
 
 #[derive(Debug, Default)]
 pub struct TaskCollection {
@@ -135,7 +133,12 @@ impl TaskCollection {
     }
 
     /// Execute task `id` with pre-collected `input_selections`.
-    pub fn execute(&self, id: usize, input_selections: IndexMap<String, String>, verbose: bool) -> anyhow::Result<()> {
+    pub fn execute(
+        &self,
+        id: usize,
+        input_selections: IndexMap<String, String>,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         let (task_set, task) = self.find_task(id)?;
 
         let mut task_command = task.command.clone();
@@ -160,21 +163,15 @@ impl TaskCollection {
     ) -> anyhow::Result<()> {
         println!("aliasx | {}\n", task.format(verbose));
 
-        let mut cmd = shell(&task_command);
-        cmd.stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
-
-        let status = cmd.status().with_context(|| "failed to execute command")?;
+        let status = Executor::new(task_command).run()?;
 
         if !status.success() {
-            let code_str = status
+            let code = status
                 .code()
                 .map_or_else(|| "unknown".to_string(), |c| c.to_string());
-
             return Err(anyhow!(
                 "command exited with non-zero status (err={})",
-                code_str
+                code
             ));
         }
 
