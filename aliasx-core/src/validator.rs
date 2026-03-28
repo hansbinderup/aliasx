@@ -136,6 +136,7 @@ impl Validator {
 
         report.add_statuses(self.check_inputs(entry, source));
         report.add_statuses(self.check_mappings(entry, source));
+        report.add_statuses(self.check_conditions(entry));
 
         report
     }
@@ -216,6 +217,18 @@ impl Validator {
                     mapping.id, mapping.input
                 ))]
             }
+        }
+    }
+
+    fn check_conditions(&self, entry: &TaskEntry) -> Option<ValidationStatus> {
+        if let Some(condition) = &entry.conditions {
+            if condition.is_valid() {
+                Some(ValidationStatus::pass("Conditions are met"))
+            } else {
+                Some(ValidationStatus::pass("Skipped as conditions are not met"))
+            }
+        } else {
+            Option::None
         }
     }
 
