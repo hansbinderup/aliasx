@@ -8,6 +8,14 @@ DISCLAIMER:
 * a way to try out package managers etc.
 * expect breaking changes, sorry.
 
+## Demo
+
+<p align="center">
+  <img src="docs/example.gif" width="700">
+</p>
+
+(see [`.aliasx.yaml`](.aliasx.yaml) for documentation of the tasks in the demo)
+
 ## Features
 
 - Lightweight and fast command-line interface
