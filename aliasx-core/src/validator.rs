@@ -9,6 +9,7 @@ use owo_colors::OwoColorize;
 pub enum ValidationStatus {
     Pass { message: String },
     Fail { message: String },
+    Skip { message: String },
 }
 
 impl ValidationStatus {
@@ -24,6 +25,12 @@ impl ValidationStatus {
         }
     }
 
+    fn skip(message: impl Into<String>) -> Self {
+        Self::Skip {
+            message: message.into(),
+        }
+    }
+
     pub fn is_pass(&self) -> bool {
         matches!(self, Self::Pass { .. })
     }
@@ -32,10 +39,17 @@ impl ValidationStatus {
         matches!(self, Self::Fail { .. })
     }
 
+    pub fn is_skip(&self) -> bool {
+        matches!(self, Self::Skip { .. })
+    }
+
     pub fn format(&self) -> String {
         match self {
             Self::Pass { message } => format!("{} {}", "✓".green().bold(), message.dimmed()),
             Self::Fail { message } => format!("{} {}", "✗".red().bold(), message),
+            Self::Skip { message } => {
+                format!("{} {} (skipped)", "⏭".yellow().bold(), message.dimmed())
+            }
         }
     }
 }
@@ -69,12 +83,20 @@ impl ValidationReport {
         self.statuses.iter().filter(|s| s.is_pass())
     }
 
+    pub fn skips(&self) -> impl Iterator<Item = &ValidationStatus> {
+        self.statuses.iter().filter(|s| s.is_skip())
+    }
+
     pub fn failure_count(&self) -> usize {
         self.failures().count()
     }
 
     pub fn pass_count(&self) -> usize {
         self.passes().count()
+    }
+
+    pub fn skip_count(&self) -> usize {
+        self.skips().count()
     }
 
     pub fn print(&self, verbose: bool) {
@@ -97,9 +119,13 @@ impl ValidationReport {
             println!("{}{}", self.validation_id.bold(), badge);
 
             // Print details with indentation
-            if verbose || fail_count > 0 {
+            if verbose {
                 for status in &self.statuses {
-                    if verbose || status.is_fail() {
+                    println!("  {}", status.format());
+                }
+            } else if fail_count > 0 {
+                for status in &self.statuses {
+                    if status.is_fail() {
                         println!("  {}", status.format());
                     }
                 }
@@ -222,10 +248,14 @@ impl Validator {
 
     fn check_conditions(&self, entry: &TaskEntry) -> Option<ValidationStatus> {
         if let Some(condition) = &entry.conditions {
+            if let Some(err) = condition.validate() {
+                return Some(ValidationStatus::fail(format!("Condition: '{}' is not valid", err)));
+            }
+
             if condition.is_valid() {
                 Some(ValidationStatus::pass("Conditions are met"))
             } else {
-                Some(ValidationStatus::pass("Skipped as conditions are not met"))
+                Some(ValidationStatus::skip("Conditions are not met"))
             }
         } else {
             Option::None
