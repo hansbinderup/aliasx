@@ -5,8 +5,8 @@ edition.workspace = true
 
 [dependencies]
 anyhow = "1.0.100"
-execute = "0.2.13"
 indexmap = { version="2.12.1", features = ["serde"] }
+nix = { version = "0.31.2", features = ["signal", "process", "term", "fs", "poll"] }
 owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 regex = "1.12.2"
 serde = { version="1.0.228", features = ["derive"] }
