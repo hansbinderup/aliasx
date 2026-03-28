@@ -37,8 +37,13 @@ Options:
 
   -f, --filter <FILTER>
           filter which tasks to include
-          
+
           [default: all]
+
+  -c, --conditions <CONDITIONS>
+          enable conditions
+
+          [possible values: true, false]
 
   -h, --help
           Print help (see a summary with '-h')
@@ -59,6 +64,7 @@ Quick start
 - `-n, --native`  : show only native shell aliases
 - `-f, --filter <local|global|all>` : restrict scope
 - `-v, --verbose` : verbose output
+- `-c, --conditions <true|false>` : enable or disable conditions (default: true; for example, use `--conditions false` to disable)
 
 ### fzf command flags:
 - `-q, --query <text>` : initial search query for the `fzf` / `f` subcommand (use as `aliasx fzf --query <text>` or `aliasx f --query <text>`)

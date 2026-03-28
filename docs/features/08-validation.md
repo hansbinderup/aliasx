@@ -115,4 +115,4 @@ Cargo build package FAIL 1/3
 
 ---
 
-Navigation: ← [Previous: TUI](07-tui.md) | [Next: Installation & Getting Started](01-installation.md) →
+Navigation: ← [Previous: TUI](07-tui.md) | [Next: Conditions](09-conditions.md) →

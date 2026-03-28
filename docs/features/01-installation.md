@@ -16,4 +16,4 @@
 
 ---
 
-Navigation: ← [Previous: Validation](08-validation.md) | [Next: Basics](02-basic.md) →
+Navigation: ← [Previous: Conditions](09-conditions.md) | [Next: Basics](02-basic.md) →

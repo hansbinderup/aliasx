@@ -12,7 +12,4 @@ This is the user-facing documentation index. Use it as a lookup to jump to focus
 6. [CLI](features/06-cli.md) - use aliasx without the TUI with direct cli commands
 7. [TUI](features/07-tui.md) - use aliasx with the tui for fuzzy finding and task selections (default)
 8. [Validation](features/08-validation.md) - let aliasx validate your configs for you!
-
----
-
-Navigation: ← [Installation](features/08-validation.md) | [Next: Installation & Getting Started](features/01-installation.md) →
+9. [Conditions](features/09-conditions.md) - enable/disable tasks based on provided conditions
