@@ -2,12 +2,6 @@
 
 **Alias e(x)tended** – a CLI tool to manage tasks, aliases, and build handles efficiently.
 
-DISCLAIMER:
-* aliasx is work in progress and is merely an exploration project.
-* a project for me to explore rust and the world within
-* a way to try out package managers etc.
-* expect breaking changes, sorry.
-
 ## Demo
 
 <p align="center">
@@ -44,6 +38,14 @@ Install via your preferred AUR helper, eg:
 
 ```bash
 yay -S aliasx
+```
+
+### Using cargo
+
+Install with cargo:
+
+```bash
+cargo install --git https://github.com/hansbinderup/aliasx/
 ```
 
 ## Development
