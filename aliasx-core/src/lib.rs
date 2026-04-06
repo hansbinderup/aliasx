@@ -1,4 +1,5 @@
 pub mod aliases;
+pub mod history;
 pub mod input;
 pub mod input_mapping;
 pub mod task_collection;

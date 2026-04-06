@@ -3,12 +3,14 @@ use execute::shell;
 use indexmap::{IndexMap, IndexSet};
 use std::process::Stdio;
 
+use crate::history::HistoryEntry;
+use crate::task_filter::TaskFilter;
 use crate::{
+    history::History,
     input::Input,
     tasks::{TaskEntry, Tasks},
     validator::Validator,
 };
-use crate::task_filter::TaskFilter;
 
 #[derive(Debug, Default)]
 pub struct TaskCollection {
@@ -135,7 +137,12 @@ impl TaskCollection {
     }
 
     /// Execute task `id` with pre-collected `input_selections`.
-    pub fn execute(&self, id: usize, input_selections: IndexMap<String, String>, verbose: bool) -> anyhow::Result<()> {
+    pub fn execute(
+        &self,
+        id: usize,
+        input_selections: IndexMap<String, String>,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         let (task_set, task) = self.find_task(id)?;
 
         let mut task_command = task.command.clone();
@@ -149,16 +156,29 @@ impl TaskCollection {
 
         task_command = task_set.apply_mappings(&task_command, &input_selections)?;
 
-        self.run_command(task, task_command, verbose)
+        let res = Self::run_command(&task.format(verbose), &task_command);
+
+        let entry = HistoryEntry::new(
+            &task.label,
+            &task_command,
+            if res.is_ok() { 0 } else { 1 },
+            task_set.scope,
+        );
+
+        if let Err(err) = History::append(&entry) {
+            if verbose {
+                println!("Error while adding history: {}", err.to_string());
+            }
+        }
+
+        res
     }
 
-    fn run_command(
-        &self,
-        task: &TaskEntry,
-        task_command: String,
-        verbose: bool,
+    pub fn run_command(
+        label: &str,
+        task_command: &str,
     ) -> anyhow::Result<()> {
-        println!("aliasx | {}\n", task.format(verbose));
+        println!("aliasx | {}\n", label);
 
         let mut cmd = shell(&task_command);
         cmd.stdin(Stdio::inherit())
