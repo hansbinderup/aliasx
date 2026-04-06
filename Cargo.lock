@@ -38,7 +38,6 @@ dependencies = [
  "serde",
  "serde_json5",
  "serde_yaml",
- "shellexpand",
 ]
 
 [[package]]
@@ -1571,15 +1570,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
-]
-
-[[package]]
-name = "shellexpand"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b1fdf65dd6331831494dd616b30351c38e96e45921a27745cf98490458b90bb"
-dependencies = [
- "dirs",
 ]
 
 [[package]]
