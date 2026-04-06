@@ -4,9 +4,13 @@ use clap::{Parser, Subcommand};
 use indexmap::IndexMap;
 
 use aliasx_core::{
-    aliases, history::History, task_collection::TaskCollection, task_filter::TaskFilter, tasks::{self, TaskEntry}
+    aliases,
+    history::History,
+    task_collection::TaskCollection,
+    task_filter::TaskFilter,
+    tasks::{self, TaskEntry},
 };
-use aliasx_tui::{string_fuzzy_finder, string_fuzzy_finder_with, task_fuzzy_finder, TuiSession};
+use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
 
 #[derive(Parser)]
 #[command(
@@ -109,19 +113,19 @@ pub fn run() -> anyhow::Result<()> {
         }
 
         Some(Commands::History) => {
-            let history  = History::load()?;
-            let history_str : Vec<String> = history
-                .iter()
-                .map(|e| {
-                    format!(
-                        "[{}] {}",
-                        History::format_timestamp(&e.started_at),
-                        e.task_name,
-                    )
-                })
-                .collect();
+            let history = History::load()?;
+            let mut session = TuiSession::new()?;
+            let idx = fuzzy_finder(
+                &history,
+                "History",
+                FuzzyConfig {
+                    show_details: true,
+                    ..Default::default()
+                },
+                &mut session,
+            )?;
+            drop(session);
 
-            let (idx, _) = string_fuzzy_finder(&history_str, "History", "", 0)?;
             let selected = history.index(idx);
             TaskCollection::run_command(&selected.task_name, &selected.task_command)?
         }
@@ -134,19 +138,26 @@ pub fn run() -> anyhow::Result<()> {
 
             let idx = index.unwrap();
             let mut selections = IndexMap::new();
-            for input in tasks.required_inputs_for_task(idx)? {
-                let prompt = format!(
-                    "input | {}:",
-                    input.description.as_deref().unwrap_or(&input.id)
-                );
-                let (_, val) = string_fuzzy_finder(
-                    &input.options,
-                    &prompt,
-                    "",
-                    input.get_default_selection(),
-                )?;
-                selections.insert(input.id.clone(), val);
+            let inputs = tasks.required_inputs_for_task(idx)?;
+            if !inputs.is_empty() {
+                let mut session = TuiSession::new()?;
+                for input in inputs {
+                    let prompt = format!(
+                        "input | {}:",
+                        input.description.as_deref().unwrap_or(&input.id)
+                    );
+                    let sel = fuzzy_finder(
+                        &input.options,
+                        &prompt,
+                        FuzzyConfig::default(),
+                        &mut session,
+                    )?;
+                    selections.insert(input.id.clone(), input.options[sel].clone());
+                }
+
+                drop(session);
             }
+
             tasks.execute(idx, selections, cli.verbose)?;
         }
     }
@@ -155,7 +166,7 @@ pub fn run() -> anyhow::Result<()> {
 }
 
 fn run_fzf(
-    tasks: &aliasx_core::task_collection::TaskCollection,
+    tasks: &TaskCollection,
     query: &str,
     verbose: bool,
 ) -> anyhow::Result<()> {
@@ -176,14 +187,17 @@ fn run_fzf(
             "input | {}:",
             input.description.as_deref().unwrap_or(&input.id)
         );
-        let (_, val) = string_fuzzy_finder_with(
+        let sel = fuzzy_finder(
             &input.options,
             &prompt,
-            "",
-            input.get_default_selection(),
+                FuzzyConfig {
+                    has_details: false,
+                    initial_position: input.get_default_selection(),
+                    ..Default::default()
+                },
             &mut session,
         )?;
-        selections.insert(input.id.clone(), val);
+        selections.insert(input.id.clone(), input.options[sel].clone());
     }
 
     drop(session);
