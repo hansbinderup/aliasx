@@ -1,12 +1,10 @@
-use std::str::FromStr;
+use std::{ops::Index, str::FromStr};
 
 use clap::{Parser, Subcommand};
 use indexmap::IndexMap;
 
 use aliasx_core::{
-    aliases,
-    task_filter::TaskFilter,
-    tasks::{self, TaskEntry},
+    aliases, history::History, task_collection::TaskCollection, task_filter::TaskFilter, tasks::{self, TaskEntry}
 };
 use aliasx_tui::{string_fuzzy_finder, string_fuzzy_finder_with, task_fuzzy_finder, TuiSession};
 
@@ -69,6 +67,10 @@ enum Commands {
     /// run validation on configs files
     #[command()]
     Validate,
+
+    /// show history
+    #[command()]
+    History,
 }
 
 pub fn run() -> anyhow::Result<()> {
@@ -104,6 +106,24 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 tasks.validate_all(cli.verbose);
             }
+        }
+
+        Some(Commands::History) => {
+            let history  = History::load()?;
+            let history_str : Vec<String> = history
+                .iter()
+                .map(|e| {
+                    format!(
+                        "[{}] {}",
+                        History::format_timestamp(&e.started_at),
+                        e.task_name,
+                    )
+                })
+                .collect();
+
+            let (idx, _) = string_fuzzy_finder(&history_str, "History", "", 0)?;
+            let selected = history.index(idx);
+            TaskCollection::run_command(&selected.task_name, &selected.task_command)?
         }
 
         None => {
