@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -152,9 +152,9 @@ impl TaskReader for JsonTaskReader {
 pub fn get_all_tasks(filter: TaskFilter, apply_conditions: bool) -> anyhow::Result<TaskCollection> {
     let local_aliasx_path = Path::new(".aliasx.yaml");
     let local_vscode_tasks = Path::new(".vscode/tasks.json");
-
-    let global_path_binding = shellexpand::tilde("~/.aliasx.yaml");
-    let global_path = Path::new(global_path_binding.as_ref());
+    let global_path = dirs::home_dir()
+        .context("could not find home directory")?
+        .join(".aliasx.yaml");
 
     let mut sources = Vec::new();
 
