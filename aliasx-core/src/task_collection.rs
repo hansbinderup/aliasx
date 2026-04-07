@@ -89,23 +89,22 @@ impl TaskCollection {
 
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
-        let mut all_reports = Vec::new();
+        let mut task_reports = Vec::new();
 
-        Validator::print_header();
 
         for (_idx, source, task) in self.all_tasks_with_source() {
             let report = validator.validate_task_command(task, source);
-
-            if verbose {
-                report.print(verbose);
-            } else {
-                report.print_compact();
-            }
-
-            all_reports.push(report);
+            task_reports.push(report);
         }
 
-        Validator::print_summary(&all_reports);
+        let history_report = validator.validate_history();
+
+        Validator::print_header();
+
+        validator.print_report(&task_reports);
+        validator.print_single_report(&history_report);
+
+        Validator::print_summary(task_reports.into_iter().chain(std::iter::once(history_report)));
     }
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
