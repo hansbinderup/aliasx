@@ -1,4 +1,5 @@
 use crate::{
+    history::History,
     input::Input,
     input_mapping::InputMapping,
     tasks::{TaskEntry, Tasks},
@@ -67,6 +68,10 @@ impl ValidationReport {
         }
     }
 
+    fn add_status(&mut self, status: ValidationStatus) {
+        self.statuses.push(status);
+    }
+
     fn add_statuses(&mut self, statuses: impl IntoIterator<Item = ValidationStatus>) {
         self.statuses.extend(statuses);
     }
@@ -100,40 +105,35 @@ impl ValidationReport {
     }
 
     pub fn print(&self, verbose: bool) {
+        if !verbose {
+            self.print_compact();
+            return;
+        }
+
         let fail_count = self.failure_count();
         let total = self.statuses.len();
 
         // Print header with task name and status badge
-        if verbose || fail_count > 0 {
-            let badge = if fail_count == 0 {
-                format!(" {}", "PASS".green().bold())
-            } else {
-                format!(
-                    " {} {}/{}",
-                    "FAIL".red().bold(),
-                    fail_count.red().bold(),
-                    total
-                )
-            };
+        let badge = if fail_count == 0 {
+            format!(" {}", "PASS".green().bold())
+        } else {
+            format!(
+                " {} {}/{}",
+                "FAIL".red().bold(),
+                fail_count.red().bold(),
+                total
+            )
+        };
 
-            println!("{}{}", self.validation_id.bold(), badge);
+        println!("{}{}", self.validation_id.bold(), badge);
 
-            // Print details with indentation
-            if verbose {
-                for status in &self.statuses {
-                    println!("  {}", status.format());
-                }
-            } else if fail_count > 0 {
-                for status in &self.statuses {
-                    if status.is_fail() {
-                        println!("  {}", status.format());
-                    }
-                }
-            }
+        // Print details with indentation
+        for status in &self.statuses {
+            println!("  {}", status.format());
         }
     }
 
-    pub fn print_compact(&self) {
+    fn print_compact(&self) {
         let fail_count = self.failure_count();
 
         if fail_count == 0 {
@@ -157,6 +157,24 @@ pub struct Validator {
 }
 
 impl Validator {
+    pub fn validate_history(&self) -> ValidationReport {
+        let mut report = ValidationReport::new("History");
+
+        match History::load() {
+            Ok(data) => {
+                report.add_status(ValidationStatus::pass(format!(
+                    "History was loaded ({} entries)",
+                    data.len()
+                )));
+            }
+            Err(err) => {
+                report.add_status(ValidationStatus::fail(err.to_string()));
+            }
+        }
+
+        report
+    }
+
     pub fn validate_task_command(&self, entry: &TaskEntry, source: &Tasks) -> ValidationReport {
         let mut report = ValidationReport::new(&entry.label);
 
@@ -249,7 +267,10 @@ impl Validator {
     fn check_conditions(&self, entry: &TaskEntry) -> Option<ValidationStatus> {
         if let Some(condition) = &entry.conditions {
             if let Some(err) = condition.validate() {
-                return Some(ValidationStatus::fail(format!("Condition: '{}' is not valid", err)));
+                return Some(ValidationStatus::fail(format!(
+                    "Condition: '{}' is not valid",
+                    err
+                )));
             }
 
             if condition.is_valid() {
@@ -262,6 +283,18 @@ impl Validator {
         }
     }
 
+    pub fn print_single_report(&self, report: &ValidationReport) {
+        report.print(self.verbose);
+        println!("");
+    }
+
+    pub fn print_report(&self, reports: &[ValidationReport]) {
+        for report in reports.iter() {
+            report.print(self.verbose);
+        }
+        println!("");
+    }
+
     pub fn print_header() {
         println!("{}", "═".repeat(60).dimmed());
         println!("{}", "  VALIDATION REPORT".bold().cyan());
@@ -269,13 +302,15 @@ impl Validator {
     }
 
     // not pretty.. fix later
-    pub fn print_summary(reports: &[ValidationReport]) {
+    pub fn print_summary(reports: impl IntoIterator<Item = ValidationReport>) {
+        let reports: Vec<_> = reports.into_iter().collect();
+
         let total_tasks = reports.len();
         let failed_tasks = reports.iter().filter(|r| r.has_failures()).count();
         let passed_tasks = total_tasks - failed_tasks;
         let total_failures = reports.iter().map(|r| r.failure_count()).sum::<usize>();
 
-        println!("\n{}", "═".repeat(60).dimmed());
+        println!("{}", "═".repeat(60).dimmed());
         println!("{}", "  SUMMARY".bold().cyan());
         println!("{}", "═".repeat(60).dimmed());
 
