@@ -49,14 +49,12 @@ pub fn task_fuzzy_finder(
 
     let items: Vec<TaskFuzzyItem> = tasks
         .iter()
-        .map(|(id, scope, t)| {
-            TaskFuzzyItem {
-                original_id: *id,
-                id_prefix: format!("{:0>width$} ", id),
-                task_label: t.label.clone(),
-                detail: t.command.clone(),
-                scope_key: Some(scope.to_string())
-            }
+        .map(|(id, scope, t)| TaskFuzzyItem {
+            original_id: *id,
+            id_prefix: format!("{:0>width$} ", id),
+            task_label: t.label.clone(),
+            detail: t.command.clone(),
+            scope_key: Some(scope.to_string()),
         })
         .collect();
 
@@ -65,9 +63,13 @@ pub fn task_fuzzy_finder(
         "Search",
         FuzzyConfig {
             show_details: verbose,
-            filters: vec!["all".into(), "local".into(), "global".into()],
+            filters: vec![
+                TaskFilter::All.to_string(),
+                TaskFilter::Local.to_string(),
+                TaskFilter::Global.to_string(),
+            ],
             initial_query: query.to_string(),
-            .. FuzzyConfig::default()
+            ..FuzzyConfig::default()
         },
         session,
     )?;
