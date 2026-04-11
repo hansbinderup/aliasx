@@ -16,4 +16,4 @@
 
 ---
 
-Navigation: ← [Previous: Conditions](09-conditions.md) | [Next: Basics](02-basic.md) →
+Navigation: ← [Previous: History](10-history.md) | [Next: Basics](02-basic.md) →

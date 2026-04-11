@@ -13,3 +13,4 @@ This is the user-facing documentation index. Use it as a lookup to jump to focus
 7. [TUI](features/07-tui.md) - use aliasx with the tui for fuzzy finding and task selections (default)
 8. [Validation](features/08-validation.md) - let aliasx validate your configs for you!
 9. [Conditions](features/09-conditions.md) - enable/disable tasks based on provided conditions
+10. [History](features/10-history.md) - list previously resolved tasks and allow you to re-execute

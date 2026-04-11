@@ -75,4 +75,4 @@ Conditions will only be marked as failed if the provided options can not be trea
 
 ---
 
-Navigation: ← [Previous: Validation](08-validation.md) | [Next: Installation & Getting Started](01-installation.md) →
+Navigation: ← [Previous: Validation](08-validation.md) | [Next: History](10-history.md) →
