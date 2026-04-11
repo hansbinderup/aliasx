@@ -5,7 +5,6 @@ You can always run `aliasx --help` for full self documentation.
 ```bash
 $ aliasx --help
 Alias e(x)tended CLI
-
 Examples:
   aliasx                    (default to fzf)
   aliasx ls                 (list aliases)
@@ -13,8 +12,8 @@ Examples:
   aliasx --index 0          (execute alias 0)
   aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
   aliasx -n -v -i 0 ls      (list first native aliases verbosely)
-  aliasx -f local ls        (filter local aliases only)
-  aliasx -v validate        (validates all configs verbosely)
+  aliasx ls -f local        (filter local aliases only)
+  aliasx validate -v        (validates all configs verbosely)
 
 
 Usage: aliasx [OPTIONS] [COMMAND]
@@ -23,14 +22,12 @@ Commands:
   ls        list all aliases (list)
   fzf       use fuzzy finder (f)
   validate  run validation on configs files
+  history   use history instead of tasks
   help      Print this message or the help of the given subcommand(s)
 
 Options:
   -i, --index <INDEX>
           the index of alias to handle
-
-  -n, --native
-          only apply to native aliases
 
   -v, --verbose
           verbose output
@@ -39,6 +36,9 @@ Options:
           filter which tasks to include
 
           [default: all]
+
+  -n, --native
+          only apply to native aliases
 
   -c, --conditions <CONDITIONS>
           enable conditions
