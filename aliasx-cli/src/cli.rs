@@ -17,7 +17,6 @@ use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
     version,
     about = "Alias e(x)tended CLI",
     long_about = "Alias e(x)tended CLI
-
 Examples:
   aliasx                    (default to fzf)
   aliasx ls                 (list aliases)
@@ -25,8 +24,8 @@ Examples:
   aliasx --index 0          (execute alias 0)
   aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
   aliasx -n -v -i 0 ls      (list first native aliases verbosely)
-  aliasx -f local ls        (filter local aliases only)
-  aliasx -v validate        (validates all configs verbosely)
+  aliasx ls -f local        (filter local aliases only)
+  aliasx validate -v        (validates all configs verbosely)
 "
 )]
 struct Cli {
@@ -34,23 +33,23 @@ struct Cli {
     command: Option<Commands>,
 
     /// the index of alias to handle
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     index: Option<usize>,
 
-    /// only apply to native aliases
-    #[arg(short, long)]
-    native: bool,
-
     /// verbose output
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     verbose: bool,
 
     /// filter which tasks to include
-    #[arg(short, long, value_parser = TaskFilter::from_str, default_value_t = TaskFilter::All)]
+    #[arg(short, long, global = true, value_parser = TaskFilter::from_str, default_value_t = TaskFilter::All)]
     filter: TaskFilter,
 
+    /// only apply to native aliases
+    #[arg(short, long, global = true)]
+    native: bool,
+
     /// enable conditions
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     conditions: Option<bool>,
 }
 
@@ -77,13 +76,8 @@ enum Commands {
     History,
 }
 
-pub fn run() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let index = &cli.index;
-
-    // default to enable conditions - but always disable when validating
-    let enable_conditions =
-        cli.conditions.unwrap_or(true) && !matches!(cli.command, Some(Commands::Validate));
+fn get_tasks(cli: &Cli) -> anyhow::Result<TaskCollection> {
+    let enable_conditions = cli.conditions.unwrap_or(true);
 
     let tasks = if cli.native {
         aliases::get_aliases_as_tasks()?
@@ -91,8 +85,15 @@ pub fn run() -> anyhow::Result<()> {
         tasks::get_all_tasks(cli.filter, enable_conditions)?
     };
 
+    Ok(tasks)
+}
+
+pub fn run() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
     match &cli.command {
-        Some(Commands::Ls) => {
+        Some(Commands::Ls { }) => {
+            let tasks = get_tasks(&cli)?;
             if let Some(idx) = cli.index {
                 tasks.list_at(idx, cli.verbose)?;
             } else {
@@ -101,10 +102,12 @@ pub fn run() -> anyhow::Result<()> {
         }
 
         Some(Commands::Fzf { query }) => {
+            let tasks = get_tasks(&cli)?;
             run_fzf(&tasks, query.as_deref().unwrap_or(""), cli.verbose)?;
         }
 
-        Some(Commands::Validate) => {
+        Some(Commands::Validate {  }) => {
+            let tasks = tasks::get_all_tasks(cli.filter, false)?; // always disable conditions
             if let Some(idx) = cli.index {
                 tasks.validate_at(idx, cli.verbose)?;
             } else {
@@ -125,18 +128,46 @@ pub fn run() -> anyhow::Result<()> {
                 &mut session,
             )?;
             drop(session);
+            let history = History::load_filtered(cli.filter)?;
+
+            let idx = if let Some(idx) = cli.index {
+                idx
+            } else {
+                let mut session = TuiSession::new()?;
+                let selected_idx = fuzzy_finder(
+                    &history,
+                    "History",
+                    FuzzyConfig {
+                        show_details: true,
+                        ..Default::default()
+                    },
+                    &mut session,
+                )?;
+                drop(session);
+                selected_idx
+            };
+
+            if idx >= history.len() {
+                return Err(anyhow::anyhow!("history does not contain entry with idx={} (history size={})", idx, history.len()));
+            }
 
             let selected = history.index(idx);
-            TaskCollection::run_command(&selected.task_name, &selected.task_command)?
+            let name = if cli.verbose {
+                &selected.task_command
+            } else {
+                &selected.task_name
+            };
+            TaskCollection::run_command(name, &selected.task_command)?
         }
 
         None => {
-            if index.is_none() {
+            let tasks = get_tasks(&cli)?;
+            if cli.index.is_none() {
                 run_fzf(&tasks, "", cli.verbose)?;
                 return Ok(());
             }
 
-            let idx = index.unwrap();
+            let idx = cli.index.unwrap();
             let mut selections = IndexMap::new();
             let inputs = tasks.required_inputs_for_task(idx)?;
             if !inputs.is_empty() {
@@ -154,7 +185,6 @@ pub fn run() -> anyhow::Result<()> {
                     )?;
                     selections.insert(input.id.clone(), input.options[sel].clone());
                 }
-
                 drop(session);
             }
 
@@ -165,11 +195,7 @@ pub fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_fzf(
-    tasks: &TaskCollection,
-    query: &str,
-    verbose: bool,
-) -> anyhow::Result<()> {
+fn run_fzf(tasks: &TaskCollection, query: &str, verbose: bool) -> anyhow::Result<()> {
     let indexed = tasks.indexed_tasks();
     let entries: Vec<(usize, TaskFilter, &TaskEntry)> = indexed
         .iter()
@@ -190,11 +216,11 @@ fn run_fzf(
         let sel = fuzzy_finder(
             &input.options,
             &prompt,
-                FuzzyConfig {
-                    has_details: false,
-                    initial_position: input.get_default_selection(),
-                    ..Default::default()
-                },
+            FuzzyConfig {
+                has_details: false,
+                initial_position: input.get_default_selection(),
+                ..Default::default()
+            },
             &mut session,
         )?;
         selections.insert(input.id.clone(), input.options[sel].clone());
@@ -244,7 +270,7 @@ mod tests {
         let cli = Cli::try_parse_from(&args).unwrap();
 
         match cli.command {
-            Some(Commands::Fzf { query }) => assert_eq!(query, Some("hello".into())),
+            Some(Commands::Fzf { query, .. }) => assert_eq!(query, Some("hello".into())),
             _ => panic!("Expected fzf command with query"),
         }
 
@@ -257,7 +283,7 @@ mod tests {
         let cli = Cli::try_parse_from(&args).unwrap();
 
         match cli.command {
-            Some(Commands::Fzf { query }) => assert_eq!(query, Some("native".into())),
+            Some(Commands::Fzf { query, .. }) => assert_eq!(query, Some("native".into())),
             _ => panic!("Expected fzf command with query"),
         }
 

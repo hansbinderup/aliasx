@@ -90,6 +90,14 @@ impl History {
         Ok(rows)
     }
 
+    pub fn load_filtered(filter: TaskFilter) -> anyhow::Result<Vec<HistoryEntry>> {
+        let mut history = Self::load()?;
+        if filter != TaskFilter::All {
+            history.retain(|h| h.scope == filter);
+        }
+        Ok(history)
+    }
+
     pub fn append(entry: &HistoryEntry) -> anyhow::Result<()> {
         let mut conn = Self::connect()?;
         let tx = conn.transaction()?;
