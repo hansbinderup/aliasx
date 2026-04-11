@@ -71,9 +71,13 @@ enum Commands {
     #[command()]
     Validate,
 
-    /// show history
-    #[command()]
-    History,
+    /// use history instead of tasks
+    #[command(aliases = ["h"])]
+    History {
+        /// clear entire history
+        #[arg(long)]
+        clear: bool,
+    },
 }
 
 fn get_tasks(cli: &Cli) -> anyhow::Result<TaskCollection> {
@@ -115,19 +119,12 @@ pub fn run() -> anyhow::Result<()> {
             }
         }
 
-        Some(Commands::History) => {
-            let history = History::load()?;
-            let mut session = TuiSession::new()?;
-            let idx = fuzzy_finder(
-                &history,
-                "History",
-                FuzzyConfig {
-                    show_details: true,
-                    ..Default::default()
-                },
-                &mut session,
-            )?;
-            drop(session);
+        Some(Commands::History {  clear }) => {
+            if *clear {
+                History::clear()?;
+                return Ok(());
+            }
+
             let history = History::load_filtered(cli.filter)?;
 
             let idx = if let Some(idx) = cli.index {
