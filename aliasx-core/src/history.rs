@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use chrono::{DateTime, Local, Utc};
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 use serde::{Deserialize, Serialize};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use rusqlite::{params, Connection};
 
 use crate::task_filter::TaskFilter;
@@ -42,10 +44,7 @@ pub struct History;
 
 impl History {
     fn connect() -> anyhow::Result<Connection> {
-        let path = dirs::data_local_dir()
-            .context("could not find local data directory")?
-            .join("aliasx")
-            .join("history.db");
+        let path = Self::get_path()?;
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -65,7 +64,30 @@ impl History {
             );
         ",
         )?;
+
         Ok(conn)
+    }
+
+    fn get_path() -> anyhow::Result<PathBuf> {
+        let path = dirs::data_local_dir()
+            .context("could not find local data directory")?
+            .join("aliasx")
+            .join("history.db");
+
+        Ok(path)
+    }
+
+    pub fn clear() -> anyhow::Result<()> {
+        let path = Self::get_path()?;
+
+        if !path.try_exists()? {
+            return Err(anyhow!("No history found"));
+        }
+
+        std::fs::remove_file(path)?;
+        println!("History was cleared");
+
+        Ok(())
     }
 
     pub fn load() -> anyhow::Result<Vec<HistoryEntry>> {
