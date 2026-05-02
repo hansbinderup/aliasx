@@ -35,8 +35,7 @@ impl HistoryEntry {
 impl FromSql for TaskFilter {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let s = value.as_str()?;
-
-        s.parse().map_err(|e: String| FromSqlError::Other(e.into()))
+        s.parse::<Self>().map_err(|e| FromSqlError::Other(e.into()))
     }
 }
 
