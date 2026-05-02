@@ -6,25 +6,20 @@ You can always run `aliasx --help` for full self documentation.
 $ aliasx --help
 Alias e(x)tended CLI
 
-Usage: aliasx [OPTIONS] [COMMAND]
+Usage: aliasx [COMMAND]
 
 Commands:
-  ls        list all aliases (list)
-  fzf       use fuzzy finder (f)
-  validate  run validation on configs files
-  history   use history instead of tasks
-  run       run a task by id
-  help      Print this message or the help of the given subcommand(s)
+  run               run a task
+  ls                list all aliases (list)
+  fzf               use fuzzy finder (f)
+  validate          run validation on configs files
+  history           use history instead of tasks
+  config-generator  create or convert existing configs
+  help              Print this message or the help of the given subcommand(s)
 
 Options:
-  -i, --index <INDEX>            the index of alias to handle
-  -v, --verbose                  verbose output
-  -f, --filter <FILTER>          filter which tasks to include [default: all]
-  -n, --native                   only apply to native aliases
-  -c, --conditions <CONDITIONS>  enable conditions [possible values: true, false]
-  -h, --help                     Print help
-  -V, --version                  Print version
-
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 Quick start
@@ -32,8 +27,29 @@ Quick start
 - Run `aliasx` to open the interactive fuzzy finder and pick a task or alias.
 - Use `aliasx ls` to print a list of available tasks and aliases.
 - Run `aliasx validate` to validate your current config.
-- Run `aliasx --index N` to query only that index into the command.
 - Run `aliasx run <task-id>` to run a task based on assigned id
+- Run `aliasx run --index N` to run a task based on assigned index
+
+Each command has a dedicated helper page. Call it with `--help` or `help`:
+
+```bash
+$ aliasx run --help
+run a task
+
+Usage: aliasx run [OPTIONS] [ID]
+
+Arguments:
+  [ID]  id of task to run
+
+Options:
+  -i, --index <INDEX>
+  -v, --verbose
+  -f, --filter <FILTER>          [default: all] [possible values: all, local, global]
+  -n, --native
+  -c, --conditions <CONDITIONS>  [possible values: true, false]
+  -h, --help                     Print help
+
+```
 
 ### Common flags
 
@@ -49,8 +65,8 @@ Quick start
 
 - Interactive search: aliasx
 - Search with query: aliasx f --query "test"
-- Show local tasks only: aliasx -f local ls
-- Run item by index: aliasx --index 3
+- Show local tasks only: aliasx ls -f local
+- Run item by index: aliasx run --index 3
 
 ---
 
