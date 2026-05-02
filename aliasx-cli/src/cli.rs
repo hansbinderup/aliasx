@@ -8,7 +8,7 @@ use aliasx_core::{
     history::History,
     task_collection::TaskCollection,
     task_filter::TaskFilter,
-    tasks::{self, TaskEntry},
+    tasks::{self},
 };
 use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
 
@@ -157,20 +157,16 @@ pub fn run() -> anyhow::Result<()> {
 
         Some(Commands::Run { id }) => {
             if cli.index.is_some() {
-                return Err(anyhow::anyhow!("Run with index and ID is ambigious"));
+                return Err(anyhow::anyhow!("cannot combine --index with run <id>"));
             }
 
             let tasks = get_tasks(&cli)?;
+            let itask = tasks.find_itask_from_id(id)?;
+            let mut session = TuiSession::new()?;
+            let input_selections = run_fzf_inputs(&tasks, itask.idx, &mut session)?;
+            drop(session);
 
-            if let Some(task) = tasks.find_task_from_id(id) {
-                let mut session = TuiSession::new()?;
-                let input_selections = run_fzf_inputs(&tasks, task.0, &mut session)?;
-                drop(session);
-
-                tasks.execute(task.0, &input_selections, cli.verbose)?;
-            } else {
-                return Err(anyhow::anyhow!("Could not find task with id={}", id));
-            }
+            tasks.execute(&itask, &input_selections, cli.verbose)?;
         }
 
         None => {
@@ -180,28 +176,14 @@ pub fn run() -> anyhow::Result<()> {
                 return Ok(());
             }
 
-            let idx = cli.index.unwrap();
-            let mut selections = IndexMap::new();
-            let inputs = tasks.required_inputs_for_task(idx)?;
-            if !inputs.is_empty() {
+            if let Some(idx) = cli.index {
+                let itask = tasks.find_itask_from_idx(idx)?;
                 let mut session = TuiSession::new()?;
-                for input in inputs {
-                    let prompt = format!(
-                        "input | {}:",
-                        input.description.as_deref().unwrap_or(&input.id)
-                    );
-                    let sel = fuzzy_finder(
-                        &input.options,
-                        &prompt,
-                        FuzzyConfig::default(),
-                        &mut session,
-                    )?;
-                    selections.insert(input.id.clone(), input.options[sel].clone());
-                }
+                let input_selections = run_fzf_inputs(&tasks, itask.idx, &mut session)?;
                 drop(session);
-            }
 
-            tasks.execute(idx, &selections, cli.verbose)?;
+                tasks.execute(&itask, &input_selections, cli.verbose)?;
+            }
         }
     }
 
@@ -216,7 +198,9 @@ fn run_fzf_task(tasks: &TaskCollection, query: &str, verbose: bool) -> anyhow::R
     let input_selections = run_fzf_inputs(tasks, selected_idx, &mut session)?;
 
     drop(session);
-    tasks.execute(selected_idx, &input_selections, verbose)
+
+    let itask = tasks.find_itask_from_idx(selected_idx)?;
+    tasks.execute(&itask, &input_selections, verbose)
 }
 
 fn run_fzf_inputs(

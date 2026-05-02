@@ -1,6 +1,5 @@
-use aliasx_core::task_collection::TaskCollection;
+use aliasx_core::task_collection::{IndexedTask, TaskCollection};
 use aliasx_core::task_filter::TaskFilter;
-use aliasx_core::tasks::TaskEntry;
 use anyhow::Result;
 
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
 };
 
 struct TaskFuzzyItem {
-    original_id: usize,
+    original_idx: usize,
     id_prefix: String,
     task_label: String,
     detail: String,
@@ -39,7 +38,7 @@ impl FuzzyList for TaskFuzzyItem {
 }
 
 pub fn task_fuzzy_finder(
-    tasks: &[(usize, TaskFilter, &TaskEntry)],
+    itasks: &[IndexedTask<'_>],
     collection: &TaskCollection,
     session: &mut TuiSession,
     query: &str,
@@ -47,14 +46,14 @@ pub fn task_fuzzy_finder(
 ) -> Result<usize> {
     let width = collection.width_idx();
 
-    let items: Vec<TaskFuzzyItem> = tasks
+    let items: Vec<TaskFuzzyItem> = itasks
         .iter()
-        .map(|(id, scope, t)| TaskFuzzyItem {
-            original_id: *id,
-            id_prefix: format!("{:0>width$} ", id),
-            task_label: t.label.clone(),
-            detail: t.command.clone(),
-            scope_key: Some(scope.to_string()),
+        .map(|t| TaskFuzzyItem {
+            original_idx: t.idx,
+            id_prefix: format!("{:0>width$} ", t.idx),
+            task_label: t.task.label.clone(),
+            detail: t.task.command.clone(),
+            scope_key: Some(t.source.scope.to_string()),
         })
         .collect();
 
@@ -74,5 +73,5 @@ pub fn task_fuzzy_finder(
         session,
     )?;
 
-    Ok(items[sel].original_id)
+    Ok(items[sel].original_idx)
 }
