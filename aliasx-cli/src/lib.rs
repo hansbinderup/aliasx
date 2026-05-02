@@ -1,5 +1,5 @@
 pub mod cli;
 
-pub fn run() -> anyhow::Result<()> {
-    cli::run()
+pub fn parse_and_run() -> anyhow::Result<()> {
+    cli::parse_and_run()
 }
