@@ -1,8 +1,3 @@
-use std::{ops::Index, path::PathBuf, str::FromStr};
-
-use clap::{Args, Parser, Subcommand};
-use indexmap::IndexMap;
-
 use aliasx_core::{
     aliases,
     config_generator::ConfigGenerator,
@@ -12,6 +7,26 @@ use aliasx_core::{
     tasks::{self},
 };
 use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use indexmap::IndexMap;
+use std::{ops::Index, path::PathBuf};
+
+#[derive(ValueEnum, Clone, Debug, Copy)]
+enum TaskFilterCli {
+    All,
+    Local,
+    Global,
+}
+
+impl From<TaskFilterCli> for TaskFilter {
+    fn from(f: TaskFilterCli) -> Self {
+        match f {
+            TaskFilterCli::All => TaskFilter::All,
+            TaskFilterCli::Local => TaskFilter::Local,
+            TaskFilterCli::Global => TaskFilter::Global,
+        }
+    }
+}
 
 #[derive(Args)]
 struct TaskOptions {
@@ -45,13 +60,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// run a task by id
+    /// run a task
     #[command(aliases = ["r"])]
     Run {
         #[command(flatten)]
         task_options: TaskOptions,
 
-        /// alias id
+        /// id of task to run
         #[arg()]
         id: Option<String>,
     },
@@ -124,7 +139,7 @@ fn get_tasks(task_options: &TaskOptions) -> anyhow::Result<TaskCollection> {
     let tasks = if task_options.native {
         aliases::get_aliases_as_tasks()?
     } else {
-        tasks::get_all_tasks(task_options.filter, enable_conditions)?
+        tasks::get_all_tasks(task_options.filter.into(), enable_conditions)?
     };
 
     Ok(tasks)
@@ -155,7 +170,7 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
         }
 
         Some(Commands::Validate { task_options }) => {
-            let tasks = tasks::get_all_tasks(task_options.filter, false)?; // always disable conditions
+            let tasks = tasks::get_all_tasks(task_options.filter.into(), false)?; // always disable conditions
             if let Some(idx) = task_options.index {
                 tasks.validate_at(idx, task_options.verbose)?;
             } else {
@@ -172,7 +187,7 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
                 return Ok(());
             }
 
-            let history = History::load_filtered(task_options.filter)?;
+            let history = History::load_filtered(task_options.filter.into())?;
 
             let idx = if let Some(idx) = task_options.index {
                 idx
