@@ -129,6 +129,7 @@ impl TaskCollection {
         Validator::print_summary(
             task_reports
                 .into_iter()
+                .chain(std::iter::once(task_id_report))
                 .chain(std::iter::once(history_report)),
         );
     }
