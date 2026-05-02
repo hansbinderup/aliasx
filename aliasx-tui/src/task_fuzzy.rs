@@ -52,7 +52,7 @@ pub fn task_fuzzy_finder(
             original_idx: t.idx,
             id_prefix: format!("{:0>width$} ", t.idx),
             task_label: t.task.label.clone(),
-            detail: t.task.command.clone(),
+            detail: format!("{}{}", t.task.id.clone().unwrap_or("".to_string()), t.task.command.clone()),
             scope_key: Some(t.source.scope.to_string()),
         })
         .collect();

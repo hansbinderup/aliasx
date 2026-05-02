@@ -2,8 +2,10 @@ use crate::{
     history::History,
     input::Input,
     input_mapping::InputMapping,
+    task_collection::IndexedTask,
     tasks::{TaskEntry, Tasks},
 };
+use indexmap::IndexMap;
 use owo_colors::OwoColorize;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -170,6 +172,31 @@ impl Validator {
             Err(err) => {
                 report.add_status(ValidationStatus::fail(err.to_string()));
             }
+        }
+
+        report
+    }
+
+    pub fn validate_task_ids(&self, itasks: &[IndexedTask<'_>]) -> ValidationReport {
+        let mut report = ValidationReport::new("Task IDs");
+        let mut seen: IndexMap<&str, usize> = IndexMap::new(); // id -> already seen idx
+
+        for itask in itasks {
+            let IndexedTask { idx, task, .. } = itask;
+            if let Some(id) = task.id.as_deref() {
+                if let Some(prev_id) = seen.insert(id, *idx) {
+                    report.add_status(ValidationStatus::fail(format!(
+                        "duplicate id '{}' at idx={} (already seen at idx={})",
+                        id, idx, prev_id
+                    )));
+                }
+            }
+        }
+
+        if self.verbose && !report.has_failures() {
+            report.add_status(ValidationStatus::Pass {
+                message: "All task IDs are unique".to_string(),
+            });
         }
 
         report
