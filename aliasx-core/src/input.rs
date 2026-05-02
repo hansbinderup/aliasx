@@ -12,9 +12,14 @@ static REPLACE_REGEX: LazyLock<Regex> =
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Input {
     pub id: String,
-    pub options: Vec<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+
+    pub options: Vec<String>,
 }
 
 // Input is defined as ${<type>:<id>}
