@@ -13,6 +13,7 @@ use crate::task_filter::TaskFilter;
 pub struct TaskEntry {
     pub label: String,
     pub command: String,
+    pub id: Option<String>,
     pub conditions: Option<TaskCondition>,
 }
 
