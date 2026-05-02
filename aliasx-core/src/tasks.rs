@@ -41,8 +41,8 @@ impl TaskEntry {
         }
     }
 
-    pub fn print(&self, id: usize, verbose: bool, width: usize) {
-        println!("[{:0>width$}] {}", id, self.format(verbose));
+    pub fn print(&self, idx: usize, verbose: bool, width: usize) {
+        println!("[{:0>width$}] {}", idx, self.format(verbose));
     }
 }
 
@@ -190,6 +190,7 @@ mod tests {
         TaskEntry {
             label: label.to_string(),
             command: command.to_string(),
+            id: Some("id".to_string()),
             conditions: Option::None,
         }
     }

@@ -4,7 +4,7 @@ use indexmap::{IndexMap, IndexSet};
 use std::process::Stdio;
 
 use crate::history::HistoryEntry;
-use crate::task_filter::TaskFilter;
+
 use crate::{
     history::History,
     input::Input,
@@ -15,6 +15,13 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct TaskCollection {
     sources: Vec<Tasks>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct IndexedTask<'a> {
+    pub idx: usize,
+    pub source: &'a Tasks,
+    pub task: &'a TaskEntry,
 }
 
 impl TaskCollection {
@@ -30,11 +37,15 @@ impl TaskCollection {
         self.total_count().to_string().len()
     }
 
+    /// iterates *ALL* tasks - also duplicated ones
+    /// use `indexed_tasks` for deduplication
     fn all_tasks(&self) -> IndexSet<&TaskEntry> {
         self.sources.iter().flat_map(|t| t.tasks.iter()).collect()
     }
 
-    fn all_tasks_with_source(&self) -> impl Iterator<Item = (usize, &Tasks, &TaskEntry)> {
+    /// iterates *ALL* itasks - also duplicated ones
+    /// use `indexed_tasks` for deduplication
+    fn all_itasks(&self) -> impl Iterator<Item = IndexedTask<'_>> {
         let mut global_idx = 0;
         self.sources.iter().flat_map(move |source| {
             let start_idx = global_idx;
@@ -44,62 +55,64 @@ impl TaskCollection {
                 .tasks
                 .iter()
                 .enumerate()
-                .map(move |(local_idx, task)| (start_idx + local_idx, source, task))
+                .map(move |(local_idx, task)| IndexedTask {
+                    idx: start_idx + local_idx,
+                    source,
+                    task,
+                })
         })
     }
 
-    fn find_task(&self, idx: usize) -> anyhow::Result<(&Tasks, &TaskEntry)> {
-        let mut current_idx = 0;
-
-        for task_set in &self.sources {
-            let next_idx = current_idx + task_set.tasks.len();
-            if idx < next_idx {
-                let local_idx = idx - current_idx;
-                let task = task_set.tasks.get_index(local_idx).ok_or_else(|| {
-                    anyhow!("internal_error! local idx '{}' not found", local_idx)
-                })?;
-
-                return Ok((task_set, task));
-            }
-
-            current_idx = next_idx;
+    pub fn find_itask_from_idx(&self, idx: usize) -> anyhow::Result<IndexedTask<'_>> {
+        if let Some(found) = self.indexed_tasks().iter().find(|itask| itask.idx == idx) {
+            return Ok(*found);
         }
 
-        Err(anyhow!("invalid index '{}'", idx))
+        Err(anyhow!("Couldn't find task with idx={}", idx))
     }
 
-    pub fn find_task_from_id(&self, id: &str) -> Option<(usize, TaskFilter, &TaskEntry)> {
-        self.indexed_tasks()
+    pub fn find_itask_from_id(&self, id: &str) -> anyhow::Result<IndexedTask<'_>> {
+        if let Some(found) = self
+            .indexed_tasks()
             .iter()
-            .find(|task| task.2.id.as_deref() == Some(id))
-            .copied()
+            .find(|itask| itask.task.id.as_deref() == Some(id))
+        {
+            return Ok(*found);
+        }
+
+        Err(anyhow!("Couldn't find task with id={}", id))
     }
 
-    /// Returns all tasks as `(global_index, scope, &TaskEntry)`, deduplicated.
+    /// Returns all itasks as deduplicated.
     /// NOTE: indexSet does not support standard slices so therefore the vector..
-    pub fn indexed_tasks(&self) -> Vec<(usize, TaskFilter, &TaskEntry)> {
+    pub fn indexed_tasks(&self) -> Vec<IndexedTask<'_>> {
         let mut seen: IndexSet<&TaskEntry> = IndexSet::new();
-        let mut result = Vec::new();
-        for (idx, source, task) in self.all_tasks_with_source() {
-            if seen.insert(task) {
-                result.push((idx, source.scope, task));
-            }
-        }
-        result
+        self.all_itasks()
+            .filter(|itask| seen.insert(itask.task))
+            .enumerate()
+            .map(|(idx, itask)| IndexedTask {
+                idx,
+                task: itask.task,
+                source: itask.source,
+            })
+            .collect()
     }
 
     /// Returns the inputs required to execute task `idx` (direct + via mappings).
     pub fn required_inputs_for_task(&self, idx: usize) -> anyhow::Result<Vec<&Input>> {
-        let (task_set, task) = self.find_task(idx)?;
-        task_set.required_inputs_for_command(&task.command)
+        let itask = self.find_itask_from_idx(idx)?;
+
+        return itask
+            .source
+            .required_inputs_for_command(&itask.task.command);
     }
 
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
         let mut task_reports = Vec::new();
 
-        for (_idx, source, task) in self.all_tasks_with_source() {
-            let report = validator.validate_task_command(task, source);
+        for itask in self.all_itasks() {
+            let report = validator.validate_task_command(itask.task, itask.source);
             task_reports.push(report);
         }
 
@@ -119,9 +132,9 @@ impl TaskCollection {
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
         let validator = Validator { verbose };
-        let (source, task) = self.find_task(idx)?;
+        let itask = self.find_itask_from_idx(idx)?;
 
-        let report = validator.validate_task_command(task, source);
+        let report = validator.validate_task_command(itask.task, itask.source);
 
         // for single tasks we need to print a verbose report
         // otherwise there might be no output
@@ -131,8 +144,8 @@ impl TaskCollection {
     }
 
     pub fn list_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
-        let (_, task) = self.find_task(idx)?;
-        task.print(idx, verbose, self.width_idx());
+        let itask = self.find_itask_from_idx(idx)?;
+        itask.task.print(idx, verbose, self.width_idx());
 
         Ok(())
     }
@@ -148,30 +161,30 @@ impl TaskCollection {
     /// Execute task `idx` with pre-collected `input_selections`.
     pub fn execute(
         &self,
-        idx: usize,
+        itask: &IndexedTask,
         input_selections: &IndexMap<String, String>,
         verbose: bool,
     ) -> anyhow::Result<()> {
-        let (task_set, task) = self.find_task(idx)?;
+        let mut task_command = itask.task.command.clone();
 
-        let mut task_command = task.command.clone();
-
-        for input_id in Input::extract_variables(&task.command) {
+        for input_id in Input::extract_variables(&itask.task.command) {
             let val = input_selections
                 .get(&input_id)
                 .ok_or_else(|| anyhow!("no selection provided for input '{}'", input_id))?;
             task_command = Input::replace_next_variable(&task_command, val);
         }
 
-        task_command = task_set.apply_mappings(&task_command, &input_selections)?;
+        task_command = itask
+            .source
+            .apply_mappings(&task_command, input_selections)?;
 
-        let res = Self::run_command(&task.format(verbose), &task_command);
+        let res = Self::run_command(&itask.task.format(verbose), &task_command);
 
         let entry = HistoryEntry::new(
-            &task.label,
-            &task_command,
+            &itask.task.label,
+            &itask.task.command,
             if res.is_ok() { 0 } else { 1 },
-            task_set.scope,
+            itask.source.scope,
         );
 
         if let Err(err) = History::append(&entry) {
@@ -216,6 +229,7 @@ mod tests {
         TaskEntry {
             label: label.to_string(),
             command: command.to_string(),
+            id: Some("some-id".to_string()),
             conditions: Option::None,
         }
     }
@@ -293,8 +307,8 @@ mod tests {
 
         let collection = TaskCollection::new(vec![source1, source2]);
         let items: Vec<(usize, String)> = collection
-            .all_tasks_with_source()
-            .map(|(idx, _source, task)| (idx, task.label.clone()))
+            .all_itasks()
+            .map(|itask| (itask.idx, itask.task.label.clone()))
             .collect();
 
         assert_eq!(
@@ -316,8 +330,8 @@ mod tests {
 
         let collection = TaskCollection::new(vec![source1, source2, source3]);
         let items: Vec<(usize, String)> = collection
-            .all_tasks_with_source()
-            .map(|(idx, _source, task)| (idx, task.label.clone()))
+            .all_itasks()
+            .map(|itask| (itask.idx, itask.task.label.clone()))
             .collect();
 
         assert_eq!(
@@ -337,9 +351,9 @@ mod tests {
         let source2 = create_test_tasks(vec![("task3", "echo 3")]);
 
         let collection = TaskCollection::new(vec![source1, source2]);
-        let (_, task) = collection.find_task(1).unwrap();
+        let itask = collection.find_itask_from_idx(1).unwrap();
 
-        assert_eq!(task.label, "task2");
+        assert_eq!(itask.task.label, "task2");
     }
 
     #[test]
@@ -348,9 +362,9 @@ mod tests {
         let source2 = create_test_tasks(vec![("task3", "echo 3")]);
 
         let collection = TaskCollection::new(vec![source1, source2]);
-        let (_, task) = collection.find_task(2).unwrap();
+        let itask = collection.find_itask_from_idx(2).unwrap();
 
-        assert_eq!(task.label, "task3");
+        assert_eq!(itask.task.label, "task3");
     }
 
     #[test]
@@ -361,28 +375,28 @@ mod tests {
         let collection = TaskCollection::new(vec![source1, source2]);
 
         // Test boundary between sources
-        let (_, task) = collection.find_task(1).unwrap();
-        assert_eq!(task.label, "task2");
+        let itask = collection.find_itask_from_idx(1).unwrap();
+        assert_eq!(itask.task.label, "task2");
 
-        let (_, task) = collection.find_task(2).unwrap();
-        assert_eq!(task.label, "task3");
+        let itask = collection.find_itask_from_idx(2).unwrap();
+        assert_eq!(itask.task.label, "task3");
     }
 
     #[test]
-    fn test_find_task_invalid_id() {
+    fn test_find_task_invalid_idx() {
         let source1 = create_test_tasks(vec![("task1", "echo 1")]);
 
         let collection = TaskCollection::new(vec![source1]);
-        let result = collection.find_task(5);
+        let result = collection.find_itask_from_idx(5);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("invalid index"));
+        assert!(result.unwrap_err().to_string().contains("Couldn't find task with idx="));
     }
 
     #[test]
     fn test_find_task_empty_collection() {
         let collection = TaskCollection::new(vec![]);
-        let result = collection.find_task(0);
+        let result = collection.find_itask_from_idx(0);
 
         assert!(result.is_err());
     }
@@ -412,13 +426,53 @@ mod tests {
         let collection = TaskCollection::new(vec![source1, source2]);
 
         // Find task from source1
-        let (source, task) = collection.find_task(0).unwrap();
-        assert_eq!(task.label, "task1");
-        assert!(source.get_input("env1").is_ok());
+        let itask = collection.find_itask_from_idx(0).unwrap();
+        assert_eq!(itask.task.label, "task1");
+        assert!(itask.source.get_input("env1").is_ok());
 
         // Find task from source2
-        let (source, task) = collection.find_task(1).unwrap();
-        assert_eq!(task.label, "task2");
-        assert!(source.get_input("env2").is_ok());
+        let itask = collection.find_itask_from_idx(1).unwrap();
+        assert_eq!(itask.task.label, "task2");
+        assert!(itask.source.get_input("env2").is_ok());
+    }
+
+    #[test]
+    fn test_task_idx_deduplication() {
+        let source1 = create_test_tasks(vec![("task1", "echo1"), ("task2", "echo2")]);
+        let source2 = create_test_tasks(vec![("task1", "echo1"), ("task3", "echo3")]);
+        let source3 = create_test_tasks(vec![("task2", "echo2"), ("task3", "echo3")]);
+        let source4 = create_test_tasks(vec![("task4", "echo4"), ("task5", "echo5")]);
+
+        let collection = TaskCollection::new(vec![source1, source2, source3, source4]);
+
+        let all_itasks: Vec<IndexedTask<'_>> = collection.all_itasks().collect();
+        let deduplicated_itasks = collection.indexed_tasks();
+
+        assert_eq!(all_itasks.len(), 8); // should always return *ALL*
+        assert_eq!(deduplicated_itasks.len(), 5); // should only return unique and indexed in order
+                                                  // of added
+
+        assert_eq!(
+            collection.find_itask_from_idx(0).unwrap().task.label,
+            "task1"
+        );
+        assert_eq!(
+            collection.find_itask_from_idx(1).unwrap().task.label,
+            "task2"
+        );
+        assert_eq!(
+            collection.find_itask_from_idx(2).unwrap().task.label,
+            "task3"
+        );
+        assert_eq!(
+            collection.find_itask_from_idx(3).unwrap().task.label,
+            "task4"
+        );
+        assert_eq!(
+            collection.find_itask_from_idx(4).unwrap().task.label,
+            "task5"
+        );
+
+        assert!(collection.find_itask_from_idx(5).is_err());
     }
 }
