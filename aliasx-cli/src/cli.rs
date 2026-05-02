@@ -1,4 +1,4 @@
-use std::{ops::Index, str::FromStr};
+use std::{ops::Index, path::PathBuf, str::FromStr};
 
 use clap::{Parser, Subcommand};
 use indexmap::IndexMap;
@@ -84,7 +84,7 @@ enum Commands {
 enum ConfigGeneratorSubCommands {
     PrintExample,
     ConvertJson {
-        /// path to json
+        /// path to json config
         #[arg()]
         path: String,
     },
@@ -187,7 +187,7 @@ pub fn run() -> anyhow::Result<()> {
 
         Some(Commands::ConfigGenerator { command}) => match command {
             ConfigGeneratorSubCommands::PrintExample => ConfigGenerator::print_example_config()?,
-            ConfigGeneratorSubCommands::ConvertJson { path } => println!("TODO"),
+            ConfigGeneratorSubCommands::ConvertJson { path } => ConfigGenerator::convert_json_to_yaml(PathBuf::from(path))?,
         },
 
         None => {

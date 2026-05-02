@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{
     input::Input,
     input_mapping::InputMapping,
@@ -58,5 +60,18 @@ impl ConfigGenerator {
         print!("{}", config_str);
 
         Ok(())
+    }
+
+    pub fn convert_json_to_yaml<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        let tasks : Tasks = serde_json5::from_reader(reader)?;
+
+        let yaml_str = serde_yaml::to_string(&tasks)?;
+
+        print!("{}", yaml_str);
+
+        Ok(())
+
     }
 }
