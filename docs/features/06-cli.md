@@ -5,16 +5,6 @@ You can always run `aliasx --help` for full self documentation.
 ```bash
 $ aliasx --help
 Alias e(x)tended CLI
-Examples:
-  aliasx                    (default to fzf)
-  aliasx ls                 (list aliases)
-  aliasx fzf -q query       (fzf with query as search)
-  aliasx --index 0          (execute alias 0)
-  aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
-  aliasx -n -v -i 0 ls      (list first native aliases verbosely)
-  aliasx ls -f local        (filter local aliases only)
-  aliasx validate -v        (validates all configs verbosely)
-
 
 Usage: aliasx [OPTIONS] [COMMAND]
 
@@ -23,33 +13,18 @@ Commands:
   fzf       use fuzzy finder (f)
   validate  run validation on configs files
   history   use history instead of tasks
+  run       run a task by id
   help      Print this message or the help of the given subcommand(s)
 
 Options:
-  -i, --index <INDEX>
-          the index of alias to handle
+  -i, --index <INDEX>            the index of alias to handle
+  -v, --verbose                  verbose output
+  -f, --filter <FILTER>          filter which tasks to include [default: all]
+  -n, --native                   only apply to native aliases
+  -c, --conditions <CONDITIONS>  enable conditions [possible values: true, false]
+  -h, --help                     Print help
+  -V, --version                  Print version
 
-  -v, --verbose
-          verbose output
-
-  -f, --filter <FILTER>
-          filter which tasks to include
-
-          [default: all]
-
-  -n, --native
-          only apply to native aliases
-
-  -c, --conditions <CONDITIONS>
-          enable conditions
-
-          [possible values: true, false]
-
-  -h, --help
-          Print help (see a summary with '-h')
-
-  -V, --version
-          Print version
 ```
 
 Quick start
@@ -58,6 +33,7 @@ Quick start
 - Use `aliasx ls` to print a list of available tasks and aliases.
 - Run `aliasx validate` to validate your current config.
 - Run `aliasx --index N` to query only that index into the command.
+- Run `aliasx run <task-id>` to run a task based on assigned id
 
 ### Common flags
 

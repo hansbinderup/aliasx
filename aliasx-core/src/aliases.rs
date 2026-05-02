@@ -15,6 +15,7 @@ fn parse_aliases(output: &str) -> Result<Tasks> {
                 let task = TaskEntry {
                     label: name.trim().to_string(),
                     command: cmd.trim_matches('\'').to_string(),
+                    id: Option::None,
                     conditions: Option::None,
                 };
                 tasks.tasks.insert(task);

@@ -48,13 +48,13 @@ impl TaskCollection {
         })
     }
 
-    fn find_task(&self, id: usize) -> anyhow::Result<(&Tasks, &TaskEntry)> {
+    fn find_task(&self, idx: usize) -> anyhow::Result<(&Tasks, &TaskEntry)> {
         let mut current_idx = 0;
 
         for task_set in &self.sources {
             let next_idx = current_idx + task_set.tasks.len();
-            if id < next_idx {
-                let local_idx = id - current_idx;
+            if idx < next_idx {
+                let local_idx = idx - current_idx;
                 let task = task_set.tasks.get_index(local_idx).ok_or_else(|| {
                     anyhow!("internal_error! local idx '{}' not found", local_idx)
                 })?;
@@ -65,7 +65,14 @@ impl TaskCollection {
             current_idx = next_idx;
         }
 
-        Err(anyhow!("invalid index '{}'", id))
+        Err(anyhow!("invalid index '{}'", idx))
+    }
+
+    pub fn find_task_from_id(&self, id: &str) -> Option<(usize, TaskFilter, &TaskEntry)> {
+        self.indexed_tasks()
+            .iter()
+            .find(|task| task.2.id.as_deref() == Some(id))
+            .copied()
     }
 
     /// Returns all tasks as `(global_index, scope, &TaskEntry)`, deduplicated.
@@ -81,16 +88,15 @@ impl TaskCollection {
         result
     }
 
-    /// Returns the inputs required to execute task `id` (direct + via mappings).
-    pub fn required_inputs_for_task(&self, id: usize) -> anyhow::Result<Vec<&Input>> {
-        let (task_set, task) = self.find_task(id)?;
+    /// Returns the inputs required to execute task `idx` (direct + via mappings).
+    pub fn required_inputs_for_task(&self, idx: usize) -> anyhow::Result<Vec<&Input>> {
+        let (task_set, task) = self.find_task(idx)?;
         task_set.required_inputs_for_command(&task.command)
     }
 
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
         let mut task_reports = Vec::new();
-
 
         for (_idx, source, task) in self.all_tasks_with_source() {
             let report = validator.validate_task_command(task, source);
@@ -104,7 +110,11 @@ impl TaskCollection {
         validator.print_report(&task_reports);
         validator.print_single_report(&history_report);
 
-        Validator::print_summary(task_reports.into_iter().chain(std::iter::once(history_report)));
+        Validator::print_summary(
+            task_reports
+                .into_iter()
+                .chain(std::iter::once(history_report)),
+        );
     }
 
     pub fn validate_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
@@ -120,9 +130,9 @@ impl TaskCollection {
         Ok(())
     }
 
-    pub fn list_at(&self, id: usize, verbose: bool) -> anyhow::Result<()> {
-        let (_, task) = self.find_task(id)?;
-        task.print(id, verbose, self.width_idx());
+    pub fn list_at(&self, idx: usize, verbose: bool) -> anyhow::Result<()> {
+        let (_, task) = self.find_task(idx)?;
+        task.print(idx, verbose, self.width_idx());
 
         Ok(())
     }
@@ -135,14 +145,14 @@ impl TaskCollection {
         Ok(())
     }
 
-    /// Execute task `id` with pre-collected `input_selections`.
+    /// Execute task `idx` with pre-collected `input_selections`.
     pub fn execute(
         &self,
-        id: usize,
-        input_selections: IndexMap<String, String>,
+        idx: usize,
+        input_selections: &IndexMap<String, String>,
         verbose: bool,
     ) -> anyhow::Result<()> {
-        let (task_set, task) = self.find_task(id)?;
+        let (task_set, task) = self.find_task(idx)?;
 
         let mut task_command = task.command.clone();
 
@@ -173,10 +183,7 @@ impl TaskCollection {
         res
     }
 
-    pub fn run_command(
-        label: &str,
-        task_command: &str,
-    ) -> anyhow::Result<()> {
+    pub fn run_command(label: &str, task_command: &str) -> anyhow::Result<()> {
         println!("aliasx | {}\n", label);
 
         let mut cmd = shell(&task_command);

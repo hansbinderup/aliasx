@@ -13,21 +13,7 @@ use aliasx_core::{
 use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
 
 #[derive(Parser)]
-#[command(
-    version,
-    about = "Alias e(x)tended CLI",
-    long_about = "Alias e(x)tended CLI
-Examples:
-  aliasx                    (default to fzf)
-  aliasx ls                 (list aliases)
-  aliasx fzf -q query       (fzf with query as search)
-  aliasx --index 0          (execute alias 0)
-  aliasx -n                 (fzf native aliases (.bashrc, .zshrc etc))
-  aliasx -n -v -i 0 ls      (list first native aliases verbosely)
-  aliasx ls -f local        (filter local aliases only)
-  aliasx validate -v        (validates all configs verbosely)
-"
-)]
+#[command(version, about = "Alias e(x)tended CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -78,6 +64,14 @@ enum Commands {
         #[arg(long)]
         clear: bool,
     },
+
+    /// run a task by id
+    #[command(aliases = ["r"])]
+    Run {
+        /// alias id
+        #[arg()]
+        id: String,
+    },
 }
 
 fn get_tasks(cli: &Cli) -> anyhow::Result<TaskCollection> {
@@ -96,7 +90,7 @@ pub fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Ls { }) => {
+        Some(Commands::Ls {}) => {
             let tasks = get_tasks(&cli)?;
             if let Some(idx) = cli.index {
                 tasks.list_at(idx, cli.verbose)?;
@@ -107,10 +101,10 @@ pub fn run() -> anyhow::Result<()> {
 
         Some(Commands::Fzf { query }) => {
             let tasks = get_tasks(&cli)?;
-            run_fzf(&tasks, query.as_deref().unwrap_or(""), cli.verbose)?;
+            run_fzf_task(&tasks, query.as_deref().unwrap_or(""), cli.verbose)?;
         }
 
-        Some(Commands::Validate {  }) => {
+        Some(Commands::Validate {}) => {
             let tasks = tasks::get_all_tasks(cli.filter, false)?; // always disable conditions
             if let Some(idx) = cli.index {
                 tasks.validate_at(idx, cli.verbose)?;
@@ -119,7 +113,7 @@ pub fn run() -> anyhow::Result<()> {
             }
         }
 
-        Some(Commands::History {  clear }) => {
+        Some(Commands::History { clear }) => {
             if *clear {
                 History::clear()?;
                 return Ok(());
@@ -145,7 +139,11 @@ pub fn run() -> anyhow::Result<()> {
             };
 
             if idx >= history.len() {
-                return Err(anyhow::anyhow!("history does not contain entry with idx={} (history size={})", idx, history.len()));
+                return Err(anyhow::anyhow!(
+                    "history does not contain entry with idx={} (history size={})",
+                    idx,
+                    history.len()
+                ));
             }
 
             let selected = history.index(idx);
@@ -157,10 +155,28 @@ pub fn run() -> anyhow::Result<()> {
             TaskCollection::run_command(name, &selected.task_command)?
         }
 
+        Some(Commands::Run { id }) => {
+            if cli.index.is_some() {
+                return Err(anyhow::anyhow!("Run with index and ID is ambigious"));
+            }
+
+            let tasks = get_tasks(&cli)?;
+
+            if let Some(task) = tasks.find_task_from_id(id) {
+                let mut session = TuiSession::new()?;
+                let input_selections = run_fzf_inputs(&tasks, task.0, &mut session)?;
+                drop(session);
+
+                tasks.execute(task.0, &input_selections, cli.verbose)?;
+            } else {
+                return Err(anyhow::anyhow!("Could not find task with id={}", id));
+            }
+        }
+
         None => {
             let tasks = get_tasks(&cli)?;
             if cli.index.is_none() {
-                run_fzf(&tasks, "", cli.verbose)?;
+                run_fzf_task(&tasks, "", cli.verbose)?;
                 return Ok(());
             }
 
@@ -185,24 +201,30 @@ pub fn run() -> anyhow::Result<()> {
                 drop(session);
             }
 
-            tasks.execute(idx, selections, cli.verbose)?;
+            tasks.execute(idx, &selections, cli.verbose)?;
         }
     }
 
     Ok(())
 }
 
-fn run_fzf(tasks: &TaskCollection, query: &str, verbose: bool) -> anyhow::Result<()> {
-    let indexed = tasks.indexed_tasks();
-    let entries: Vec<(usize, TaskFilter, &TaskEntry)> = indexed
-        .iter()
-        .map(|(id, scope, t)| (*id, *scope, *t))
-        .collect();
-
+fn run_fzf_task(tasks: &TaskCollection, query: &str, verbose: bool) -> anyhow::Result<()> {
     let mut session = TuiSession::new()?;
-    let selected_id = task_fuzzy_finder(&entries, &tasks, &mut session, query, verbose)?;
 
-    let inputs = tasks.required_inputs_for_task(selected_id)?;
+    let entries = tasks.indexed_tasks();
+    let selected_idx = task_fuzzy_finder(&entries, &tasks, &mut session, query, verbose)?;
+    let input_selections = run_fzf_inputs(tasks, selected_idx, &mut session)?;
+
+    drop(session);
+    tasks.execute(selected_idx, &input_selections, verbose)
+}
+
+fn run_fzf_inputs(
+    tasks: &TaskCollection,
+    idx: usize,
+    session: &mut TuiSession,
+) -> anyhow::Result<IndexMap<String, String>> {
+    let inputs = tasks.required_inputs_for_task(idx)?;
     let mut selections = IndexMap::new();
 
     for input in inputs {
@@ -218,13 +240,12 @@ fn run_fzf(tasks: &TaskCollection, query: &str, verbose: bool) -> anyhow::Result
                 initial_position: input.get_default_selection(),
                 ..Default::default()
             },
-            &mut session,
+            session,
         )?;
         selections.insert(input.id.clone(), input.options[sel].clone());
     }
 
-    drop(session);
-    tasks.execute(selected_id, selections, verbose)
+    Ok(selections)
 }
 
 // TODO: add mocks to verify calls
