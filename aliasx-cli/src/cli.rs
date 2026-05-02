@@ -74,6 +74,7 @@ enum Commands {
         id: String,
     },
 
+    /// create or convert existing configs
     ConfigGenerator {
         #[command(subcommand)]
         command: ConfigGeneratorSubCommands,
@@ -82,9 +83,19 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum ConfigGeneratorSubCommands {
+    /// print a minimal example config
     PrintExample,
-    ConvertJson {
+
+    /// convert existing json config to yaml
+    JsonToYaml {
         /// path to json config
+        #[arg()]
+        path: String,
+    },
+
+    /// convert existing yaml config to json
+    YamlToJson {
+        /// path to yaml config
         #[arg()]
         path: String,
     },
@@ -187,7 +198,8 @@ pub fn run() -> anyhow::Result<()> {
 
         Some(Commands::ConfigGenerator { command}) => match command {
             ConfigGeneratorSubCommands::PrintExample => ConfigGenerator::print_example_config()?,
-            ConfigGeneratorSubCommands::ConvertJson { path } => ConfigGenerator::convert_json_to_yaml(PathBuf::from(path))?,
+            ConfigGeneratorSubCommands::JsonToYaml { path } => ConfigGenerator::convert_json_to_yaml(PathBuf::from(path))?,
+            ConfigGeneratorSubCommands::YamlToJson { path } => ConfigGenerator::convert_yaml_to_json(PathBuf::from(path))?,
         },
 
         None => {

@@ -72,6 +72,17 @@ impl ConfigGenerator {
         print!("{}", yaml_str);
 
         Ok(())
+    }
 
+    pub fn convert_yaml_to_json<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+        let tasks : Tasks = serde_yaml::from_reader(reader)?;
+
+        let json_str = serde_json::to_string_pretty(&tasks)?;
+
+        println!("{}", json_str);
+
+        Ok(())
     }
 }

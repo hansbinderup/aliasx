@@ -36,6 +36,7 @@ dependencies = [
  "regex",
  "rusqlite",
  "serde",
+ "serde_json",
  "serde_json5",
  "serde_yaml",
 ]
