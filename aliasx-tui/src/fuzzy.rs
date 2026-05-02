@@ -43,6 +43,10 @@ pub trait FuzzyList {
         None
     }
 
+    fn label_suffix(&self) -> Option<&str> {
+        None
+    }
+
     fn detail(&self) -> Option<String> {
         None
     }
@@ -102,16 +106,23 @@ fn filter_tabs(filters: &[String], active: usize) -> Line<'_> {
 }
 
 fn build_list_item<'a, T: FuzzyList>(item: &'a T, query: &str) -> ListItem<'a> {
-    let highlighted = highlight_match(item.label(), query);
-    let line = match item.label_prefix() {
-        Some(prefix) => {
-            let mut spans = vec![Span::styled(prefix, Style::default().fg(Color::DarkGray))];
-            spans.extend(highlighted.spans);
-            Line::from(spans)
-        }
-        None => highlighted,
-    };
-    ListItem::new(line)
+     let highlighted = highlight_match(item.label(), query);
+     let prefix = item.label_prefix();
+     let suffix = item.label_suffix();
+
+     if prefix.is_none() && suffix.is_none() {
+         return ListItem::new(highlighted);
+     }
+
+     let mut spans = vec![];
+     if let Some(prefix) = prefix {
+         spans.push(Span::styled(prefix, Style::default().fg(Color::DarkGray)));
+     }
+     spans.extend(highlighted.spans);
+     if let Some(suffix) = suffix {
+         spans.push(Span::styled(suffix, Style::default().fg(Color::DarkGray)));
+     }
+     ListItem::new(Line::from(spans))
 }
 
 pub fn fuzzy_finder<T: FuzzyList>(
