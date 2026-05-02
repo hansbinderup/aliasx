@@ -11,6 +11,7 @@ struct TaskFuzzyItem {
     original_idx: usize,
     id_prefix: String,
     task_label: String,
+    label_suffix: Option<String>,
     detail: String,
     scope_key: Option<String>,
 }
@@ -22,6 +23,10 @@ impl FuzzyList for TaskFuzzyItem {
 
     fn label_prefix(&self) -> Option<&str> {
         Some(&self.id_prefix)
+    }
+
+    fn label_suffix(&self) -> Option<&str> {
+        self.label_suffix.as_deref()
     }
 
     fn detail(&self) -> Option<String> {
@@ -52,7 +57,11 @@ pub fn task_fuzzy_finder(
             original_idx: t.idx,
             id_prefix: format!("{:0>width$} ", t.idx),
             task_label: t.task.label.clone(),
-            detail: format!("{}{}", t.task.id.clone().unwrap_or("".to_string()), t.task.command.clone()),
+            detail: t.task.command.clone(),
+            label_suffix: match &t.task.id {
+                Some(id) => Some(format!(" [{}]", id)),
+                None => Option::None,
+            },
             scope_key: Some(t.source.scope.to_string()),
         })
         .collect();
