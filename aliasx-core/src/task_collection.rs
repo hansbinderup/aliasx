@@ -225,11 +225,11 @@ impl TaskCollection {
 mod tests {
     use super::*;
 
-    fn create_test_task(label: &str, command: &str) -> TaskEntry {
+    fn create_test_task(label: &str, command: &str, id: Option<String>) -> TaskEntry {
         TaskEntry {
             label: label.to_string(),
             command: command.to_string(),
-            id: Some("some-id".to_string()),
+            id: id,
             conditions: Option::None,
         }
     }
@@ -237,7 +237,9 @@ mod tests {
     fn create_test_tasks(entries: Vec<(&str, &str)>) -> Tasks {
         let mut tasks = Tasks::default();
         for (label, command) in entries {
-            tasks.tasks.insert(create_test_task(label, command));
+            tasks
+                .tasks
+                .insert(create_test_task(label, command, Option::None));
         }
         tasks
     }
@@ -245,6 +247,16 @@ mod tests {
     fn create_test_tasks_with_inputs(entries: Vec<(&str, &str)>, inputs: Vec<Input>) -> Tasks {
         let mut tasks = create_test_tasks(entries);
         tasks.inputs = inputs;
+        tasks
+    }
+
+    fn create_test_tasks_with_ids(entries: Vec<(&str, &str, &str)>) -> Tasks {
+        let mut tasks = Tasks::default();
+        for (label, command, id) in entries {
+            tasks
+                .tasks
+                .insert(create_test_task(label, command, Some(id.to_string())));
+        }
         tasks
     }
 
@@ -390,7 +402,55 @@ mod tests {
         let result = collection.find_itask_from_idx(5);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Couldn't find task with idx="));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Couldn't find task with idx="));
+    }
+
+    #[test]
+    fn test_find_task_from_id() {
+        let source1 = create_test_tasks_with_ids(vec![("task1", "command", "some-id")]);
+
+        let collection = TaskCollection::new(vec![source1]);
+        let result = collection.find_itask_from_id("some-id").unwrap();
+
+        assert_eq!(result.idx, 0);
+        assert_eq!(result.task.label, "task1");
+        assert_eq!(result.task.command, "command");
+    }
+
+    #[test]
+    fn test_find_task_from_id_duplicate_id() {
+        let source1 = create_test_tasks_with_ids(vec![
+            ("task1", "command", "some-id"),
+            ("task2", "command2", "some-id"),
+        ]);
+
+        let collection = TaskCollection::new(vec![source1]);
+        let result = collection.find_itask_from_id("some-id").unwrap();
+
+        // will find the first one
+        assert_eq!(result.idx, 0);
+        assert_eq!(result.task.label, "task1");
+        assert_eq!(result.task.command, "command");
+    }
+
+    #[test]
+    fn test_find_task_from_id_invalid() {
+        let source1 = create_test_tasks_with_ids(vec![
+            ("task1", "command", "some-id"),
+            ("task2", "command2", "some-id"),
+        ]);
+
+        let collection = TaskCollection::new(vec![source1]);
+        let result = collection.find_itask_from_id("invalid-id");
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Couldn't find task with id="));
     }
 
     #[test]
