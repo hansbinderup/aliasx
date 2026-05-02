@@ -13,7 +13,11 @@ use crate::task_filter::TaskFilter;
 pub struct TaskEntry {
     pub label: String,
     pub command: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub conditions: Option<TaskCondition>,
 }
 

@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 
 use aliasx_core::{
     aliases,
+    config_generator::ConfigGenerator,
     history::History,
     task_collection::TaskCollection,
     task_filter::TaskFilter,
@@ -71,6 +72,21 @@ enum Commands {
         /// alias id
         #[arg()]
         id: String,
+    },
+
+    ConfigGenerator {
+        #[command(subcommand)]
+        command: ConfigGeneratorSubCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigGeneratorSubCommands {
+    PrintExample,
+    ConvertJson {
+        /// path to json
+        #[arg()]
+        path: String,
     },
 }
 
@@ -168,6 +184,11 @@ pub fn run() -> anyhow::Result<()> {
 
             tasks.execute(&itask, &input_selections, cli.verbose)?;
         }
+
+        Some(Commands::ConfigGenerator { command}) => match command {
+            ConfigGeneratorSubCommands::PrintExample => ConfigGenerator::print_example_config()?,
+            ConfigGeneratorSubCommands::ConvertJson { path } => println!("TODO"),
+        },
 
         None => {
             let tasks = get_tasks(&cli)?;

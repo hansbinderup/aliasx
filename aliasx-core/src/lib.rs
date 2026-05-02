@@ -7,3 +7,4 @@ pub mod task_conditions;
 pub mod task_filter;
 pub mod tasks;
 pub mod validator;
+pub mod config_generator;
