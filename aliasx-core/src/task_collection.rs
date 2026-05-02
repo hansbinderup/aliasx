@@ -110,17 +110,20 @@ impl TaskCollection {
     pub fn validate_all(&self, verbose: bool) {
         let validator = Validator { verbose };
         let mut task_reports = Vec::new();
+        let itasks: Vec<IndexedTask<'_>> = self.all_itasks().collect();
 
-        for itask in self.all_itasks() {
+        for itask in itasks.iter() {
             let report = validator.validate_task_command(itask.task, itask.source);
             task_reports.push(report);
         }
 
+        let task_id_report = validator.validate_task_ids(&itasks);
         let history_report = validator.validate_history();
 
         Validator::print_header();
 
         validator.print_report(&task_reports);
+        validator.print_single_report(&task_id_report);
         validator.print_single_report(&history_report);
 
         Validator::print_summary(
@@ -182,7 +185,7 @@ impl TaskCollection {
 
         let entry = HistoryEntry::new(
             &itask.task.label,
-            &itask.task.command,
+            &task_command,
             if res.is_ok() { 0 } else { 1 },
             itask.source.scope,
         );
