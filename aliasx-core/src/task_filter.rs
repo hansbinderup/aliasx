@@ -1,9 +1,8 @@
-use std::str::FromStr;
-use std::fmt;
-
+use strum::{Display, EnumString};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(EnumString, Display, Deserialize, Serialize, Debug, PartialEq, Clone, Copy)]
+#[strum(serialize_all = "lowercase")]
 pub enum TaskFilter {
     All,
     Local,
@@ -23,29 +22,6 @@ impl TaskFilter {
 
     pub fn include_global(self) -> bool {
         matches!(self, TaskFilter::All | TaskFilter::Global)
-    }
-}
-
-impl FromStr for TaskFilter {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "all" => Ok(TaskFilter::All),
-            "local" => Ok(TaskFilter::Local),
-            "global" => Ok(TaskFilter::Global),
-            _ => Err(format!("Invalid value for TaskFilter: {}", s)),
-        }
-    }
-}
-
-impl fmt::Display for TaskFilter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            TaskFilter::All => "all",
-            TaskFilter::Local => "local",
-            TaskFilter::Global => "global",
-        };
-        write!(f, "{}", s)
     }
 }
 
