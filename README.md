@@ -13,15 +13,14 @@ For full feature set see the [documentation](docs/README.md)
 - Global and/or project based configs
 - Fuzzy finder support
 - Variable inputs
+- Create configs on the fly
 
 ### Future features
 
 - Fully support all parameters in the vscode tasks
 - Support variable inputs
     - instead of fixed input types also support manually inputting a variable
-- Convert vscode.json file to aliasx.yaml syntax
 - Depends on - trigger other tasks before running this one
-- Create base config - prompt aliasx to create some "boiler plate configs"
 
 ## Demo
 
