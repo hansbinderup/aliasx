@@ -13,4 +13,4 @@ aliasx history -c/--clear   -> clear the entire history
 ```
 ---
 
-Navigation: ← [Previous: Conditions](09-conditions.md) | [Next: Installation & Getting Started](01-installation.md) →
+Navigation: ← [Previous: Conditions](09-conditions.md) | [Next: Config Generator](11-config-generator.md) →

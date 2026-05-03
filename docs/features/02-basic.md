@@ -8,6 +8,9 @@ Aliasx supports both json and yaml syntax. The json is only supported for the sa
 
 This repo already includes examples for [yaml](/.aliasx.yaml) and [json](/.vscode/tasks.json) syntax.
 
+Aliasx will search your current directory and your home-dir (`~/`) for `.aliasx.yaml`, `.aliasx.yml`, `.aliasx.json`, and `.aliasx.json5` files.
+In the current directory, Aliasx also supports `.vscode/tasks.json`.
+
 ## The minimal configuration
 
 Top-level file structure
@@ -18,6 +21,7 @@ Top-level file structure
 version: "1.0.0"
 tasks:
   - label: "Cargo build (release)"
+    id: "build-release"
     command: "cargo build --release"
     description: "Build the project"
   - label: "Cargo test"
@@ -33,6 +37,7 @@ Minimal task fields
 - `label` (required): short identifier shown in lists
 - `command` (required): the shell command to run
 - `description` (optional): friendly text shown in the UI
+- `id` (optional): shortcut to call directly with `aliasx run [ID]`
 
 ## Demo
 
