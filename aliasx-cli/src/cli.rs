@@ -1,10 +1,5 @@
 use aliasx_core::{
-    aliases,
-    config_generator::ConfigGenerator,
-    history::History,
-    task_collection::TaskCollection,
-    task_filter::TaskFilter,
-    tasks::{self},
+    aliases, config_generator::ConfigGenerator, history::History, task_collection::TaskCollection, task_filter::TaskFilter, task_reader::TaskFormat, tasks::{self}
 };
 use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -26,6 +21,21 @@ impl From<TaskFilterCli> for TaskFilter {
             TaskFilterCli::Global => TaskFilter::Global,
         }
     }
+}
+
+impl From<TaskFormatCli> for TaskFormat {
+    fn from(f: TaskFormatCli) -> Self {
+        match f {
+            TaskFormatCli::Yaml => TaskFormat::Yaml,
+            TaskFormatCli::Json => TaskFormat::Json,
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Debug, Copy)]
+enum TaskFormatCli {
+    Yaml,
+    Json,
 }
 
 #[derive(Args)]
@@ -117,7 +127,10 @@ enum Commands {
 #[derive(Subcommand)]
 enum ConfigGeneratorSubCommands {
     /// print a minimal example config
-    PrintExample,
+    ExampleConfig {
+        #[arg(value_enum, short, long, default_value_t = TaskFormatCli::Yaml)]
+        format: TaskFormatCli,
+    },
 
     /// convert existing json config to yaml
     JsonToYaml {
@@ -243,7 +256,9 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
         }
 
         Some(Commands::ConfigGenerator { command }) => match command {
-            ConfigGeneratorSubCommands::PrintExample => ConfigGenerator::print_example_config()?,
+            ConfigGeneratorSubCommands::ExampleConfig { format } => {
+                ConfigGenerator::print_example_config((*format).into())?
+            },
             ConfigGeneratorSubCommands::JsonToYaml { path } => {
                 ConfigGenerator::convert_json_to_yaml(PathBuf::from(path))?
             }

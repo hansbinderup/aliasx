@@ -31,7 +31,7 @@ where
     Ok(())
 }
 
-enum TaskFormat {
+pub enum TaskFormat {
     Yaml,
     Json,
 }
