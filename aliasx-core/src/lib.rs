@@ -1,10 +1,11 @@
 pub mod aliases;
+pub mod config_generator;
 pub mod history;
 pub mod input;
 pub mod input_mapping;
 pub mod task_collection;
 pub mod task_conditions;
 pub mod task_filter;
+pub mod task_reader;
 pub mod tasks;
 pub mod validator;
-pub mod config_generator;

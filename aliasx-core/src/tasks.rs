@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 use crate::input::Input;
 use crate::input_mapping::InputMapping;
 use crate::task_collection::TaskCollection;
 use crate::task_conditions::TaskCondition;
 use crate::task_filter::TaskFilter;
+use crate::task_reader;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct TaskEntry {
@@ -131,50 +131,40 @@ impl Tasks {
     }
 }
 
-struct YamlTaskReader;
-struct JsonTaskReader;
-
-trait TaskReader {
-    fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks>;
-}
-
-impl TaskReader for YamlTaskReader {
-    fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks> {
-        let file = std::fs::File::open(path)?;
-        let reader = std::io::BufReader::new(file);
-        Ok(serde_yaml::from_reader(reader)?)
-    }
-}
-
-impl TaskReader for JsonTaskReader {
-    fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Tasks> {
-        let file = std::fs::File::open(path)?;
-        let reader = std::io::BufReader::new(file);
-        Ok(serde_json5::from_reader(reader)?)
-    }
-}
-
 pub fn get_all_tasks(filter: TaskFilter, apply_conditions: bool) -> anyhow::Result<TaskCollection> {
-    let local_aliasx_path = Path::new(".aliasx.yaml");
-    let local_vscode_tasks = Path::new(".vscode/tasks.json");
-    let global_path = dirs::home_dir()
-        .context("could not find home directory")?
-        .join(".aliasx.yaml");
+    const LOCAL_SOURCES: &[&str] = &[
+        ".aliasx.yaml",
+        ".aliasx.yml",
+        ".aliasx.json",
+        ".aliasx.json5",
+        ".vscode/tasks.json",
+    ];
+
+    const GLOBAL_SOURCES: &[&str] = &[
+        ".aliasx.yaml",
+        ".aliasx.yml",
+        ".aliasx.json",
+        ".aliasx.json5",
+    ];
 
     let mut sources = Vec::new();
 
-    if filter.include_local() && local_aliasx_path.is_file() {
-        sources.push(YamlTaskReader::parse_file(local_aliasx_path)?);
+    if filter.include_local() {
+        for local_path in LOCAL_SOURCES {
+            task_reader::push_if_exists(&mut sources, local_path, TaskFilter::Local)?;
+        }
     }
 
-    if filter.include_local() && local_vscode_tasks.is_file() {
-        sources.push(JsonTaskReader::parse_file(local_vscode_tasks)?);
-    }
+    if filter.include_global() {
+        let home_path = dirs::home_dir().context("could not find global configs")?;
 
-    if filter.include_global() && global_path.is_file() {
-        let mut global = YamlTaskReader::parse_file(global_path)?;
-        global.scope = TaskFilter::Global;
-        sources.push(global);
+        for global_path in GLOBAL_SOURCES {
+            task_reader::push_if_exists(
+                &mut sources,
+                home_path.join(global_path),
+                TaskFilter::Global,
+            )?;
+        }
     }
 
     if apply_conditions {
