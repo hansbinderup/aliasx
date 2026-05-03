@@ -1,11 +1,11 @@
-use std::path::Path;
-
 use crate::{
     input::Input,
     input_mapping::InputMapping,
+    task_reader::TaskFormat,
     tasks::{TaskEntry, Tasks},
 };
 use indexmap::IndexMap;
+use std::path::Path;
 
 pub struct ConfigGenerator;
 
@@ -53,9 +53,13 @@ impl ConfigGenerator {
         tasks
     }
 
-    pub fn print_example_config() -> anyhow::Result<()> {
+    pub fn print_example_config(format: TaskFormat) -> anyhow::Result<()> {
         let config = ConfigGenerator::create_example_config();
-        let config_str = serde_yaml::to_string(&config)?;
+
+        let config_str = match format {
+            TaskFormat::Yaml => serde_yaml::to_string(&config)?,
+            TaskFormat::Json => serde_json::to_string_pretty(&config)?,
+        };
 
         print!("{}", config_str);
 
@@ -65,7 +69,7 @@ impl ConfigGenerator {
     pub fn convert_json_to_yaml<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);
-        let tasks : Tasks = serde_json5::from_reader(reader)?;
+        let tasks: Tasks = serde_json5::from_reader(reader)?;
 
         let yaml_str = serde_yaml::to_string(&tasks)?;
 
@@ -77,7 +81,7 @@ impl ConfigGenerator {
     pub fn convert_yaml_to_json<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         let file = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(file);
-        let tasks : Tasks = serde_yaml::from_reader(reader)?;
+        let tasks: Tasks = serde_yaml::from_reader(reader)?;
 
         let json_str = serde_json::to_string_pretty(&tasks)?;
 
