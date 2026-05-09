@@ -42,4 +42,4 @@ The minimal config created by `example-config` is a great starting point showing
 
 ---
 
-Navigation: ← [Previous: History](10-history.md) | [Next: Installation & Getting Started](01-installation.md) →
+Navigation: ← [Previous: History](10-history.md) | [Next: Task Options](12-task-options.md) →
