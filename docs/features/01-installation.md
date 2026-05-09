@@ -18,4 +18,4 @@
 
 ---
 
-Navigation: ← [Previous: Config Generator](11-config-generator.md) | [Next: Basics](02-basic.md) →
+Navigation: [Next: Basics](02-basic.md) →

@@ -14,4 +14,5 @@ This is the user-facing documentation index. Use it as a lookup to jump to focus
 8. [Validation](features/08-validation.md) - let aliasx validate your configs for you!
 9. [Conditions](features/09-conditions.md) - enable/disable tasks based on provided conditions
 10. [History](features/10-history.md) - list previously resolved tasks and allow you to re-execute
-10. [Config Generator](features/11-config-generator.md) - create and convert configs on the fly
+11. [Config Generator](features/11-config-generator.md) - create and convert configs on the fly
+12. [Task Options](features/12-task-options.md) - add options (cwd and envs) to your task executions
