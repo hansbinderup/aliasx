@@ -1,5 +1,12 @@
 use aliasx_core::{
-    aliases, config_generator::ConfigGenerator, history::History, task_collection::TaskCollection, task_filter::TaskFilter, task_reader::TaskFormat, tasks::{self}
+    aliases,
+    config_generator::ConfigGenerator,
+    history::History,
+    task_collection::TaskCollection,
+    task_filter::TaskFilter,
+    task_options::TaskOption,
+    task_reader::TaskFormat,
+    tasks::{self, TaskEntry},
 };
 use aliasx_tui::{fuzzy_finder, task_fuzzy_finder, FuzzyConfig, TuiSession};
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -228,12 +235,20 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
             }
 
             let selected = history.index(idx);
-            let name = if task_options.verbose {
-                &selected.task_command
-            } else {
-                &selected.task_name
+
+            // reconstruct the task from history
+            let task = TaskEntry {
+                label: selected.task_name.clone(),
+                command: selected.task_command.clone(),
+                options: Some(TaskOption {
+                    cwd: selected.cwd.clone(),
+                    env: selected.env.clone(),
+                }),
+                id: None,
+                conditions: None,
             };
-            TaskCollection::run_command(name, &selected.task_command)?
+
+            TaskCollection::run_command(&task, &selected.task_command, task_options.verbose)?
         }
 
         Some(Commands::Run { id, task_options }) => {
@@ -258,7 +273,7 @@ fn run(cli: &Cli) -> anyhow::Result<()> {
         Some(Commands::ConfigGenerator { command }) => match command {
             ConfigGeneratorSubCommands::ExampleConfig { format } => {
                 ConfigGenerator::print_example_config((*format).into())?
-            },
+            }
             ConfigGeneratorSubCommands::JsonToYaml { path } => {
                 ConfigGenerator::convert_json_to_yaml(PathBuf::from(path))?
             }

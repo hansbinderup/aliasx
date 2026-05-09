@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::{anyhow, Context};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
@@ -7,6 +9,7 @@ use crate::input_mapping::InputMapping;
 use crate::task_collection::TaskCollection;
 use crate::task_conditions::TaskCondition;
 use crate::task_filter::TaskFilter;
+use crate::task_options::TaskOption;
 use crate::task_reader;
 
 #[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -19,6 +22,9 @@ pub struct TaskEntry {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conditions: Option<TaskCondition>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<TaskOption>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -47,6 +53,14 @@ impl TaskEntry {
 
     pub fn print(&self, idx: usize, verbose: bool, width: usize) {
         println!("[{:0>width$}] {}", idx, self.format(verbose));
+    }
+
+    pub fn get_option_cwd(&self) -> Option<&Path> {
+        self.options.as_ref()?.cwd.as_deref()
+    }
+
+    pub fn get_option_env(&self) -> Option<&IndexMap<String, String>> {
+        Some(&self.options.as_ref()?.env)
     }
 }
 
@@ -186,6 +200,7 @@ mod tests {
             command: command.to_string(),
             id: Some("id".to_string()),
             conditions: Option::None,
+            options: Option::None,
         }
     }
 

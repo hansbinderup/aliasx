@@ -6,6 +6,7 @@ pub mod input_mapping;
 pub mod task_collection;
 pub mod task_conditions;
 pub mod task_filter;
+pub mod task_options;
 pub mod task_reader;
 pub mod tasks;
 pub mod validator;

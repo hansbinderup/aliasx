@@ -40,6 +40,12 @@ tasks:
       paths:
         - "**/repos/**"
         - "/home/user/github/**"
+  - label: "Task with options (env and cwd)"
+    command: "echo \"task with env: $ALIASX_ENV from $(pwd)\""
+    options:
+      env:
+        ALIASX_ENV: "THIS_IS_A_TEST"
+      cwd: "/var/log"
 
 inputs:
   - id: some-int

@@ -1,16 +1,14 @@
-use anyhow::{anyhow, Context};
-use execute::shell;
-use indexmap::{IndexMap, IndexSet};
-use std::process::Stdio;
-
 use crate::history::HistoryEntry;
-
 use crate::{
     history::History,
     input::Input,
     tasks::{TaskEntry, Tasks},
     validator::Validator,
 };
+use anyhow::{anyhow, Context};
+use execute::shell;
+use indexmap::{IndexMap, IndexSet};
+use std::process::Stdio;
 
 #[derive(Debug, Default)]
 pub struct TaskCollection {
@@ -182,10 +180,10 @@ impl TaskCollection {
             .source
             .apply_mappings(&task_command, input_selections)?;
 
-        let res = Self::run_command(&itask.task.format(verbose), &task_command);
+        let res = Self::run_command(&itask.task, &task_command, verbose);
 
         let entry = HistoryEntry::new(
-            &itask.task.label,
+            &itask.task,
             &task_command,
             if res.is_ok() { 0 } else { 1 },
             itask.source.scope,
@@ -200,10 +198,18 @@ impl TaskCollection {
         res
     }
 
-    pub fn run_command(label: &str, task_command: &str) -> anyhow::Result<()> {
-        println!("aliasx | {}\n", label);
+    pub fn run_command(task: &TaskEntry, task_command: &str, verbose: bool) -> anyhow::Result<()> {
+        println!("aliasx | {}\n", task.format(verbose));
 
         let mut cmd = shell(&task_command);
+        if let Some(cwd) = task.get_option_cwd() {
+            cmd.current_dir(cwd);
+        }
+
+        if let Some(env) = task.get_option_env() {
+            cmd.envs(env);
+        }
+
         cmd.stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
@@ -235,6 +241,7 @@ mod tests {
             command: command.to_string(),
             id: id,
             conditions: Option::None,
+            options: Option::None,
         }
     }
 
