@@ -1,13 +1,12 @@
+use anyhow::{anyhow, Context};
+use chrono::{DateTime, Local, Utc};
+use indexmap::IndexMap;
+use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use chrono::{DateTime, Local, Utc};
-use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
-use serde::{Deserialize, Serialize};
-
-use anyhow::{anyhow, Context};
-use rusqlite::{params, Connection};
-
-use crate::task_filter::TaskFilter;
+use crate::{task_filter::TaskFilter, tasks::TaskEntry};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HistoryEntry {
@@ -17,17 +16,21 @@ pub struct HistoryEntry {
     pub started_at: DateTime<Utc>,
     pub exit_code: i32,
     pub scope: TaskFilter,
+    pub cwd: Option<PathBuf>,
+    pub env: IndexMap<String, String>,
 }
 
 impl HistoryEntry {
-    pub fn new(task_name: &str, task_command: &str, exit_code: i32, scope: TaskFilter) -> Self {
+    pub fn new(task: &TaskEntry, task_command: &str, exit_code: i32, scope: TaskFilter) -> Self {
         Self {
             id: 0,
-            task_name: task_name.to_string(),
+            task_name: task.label.clone(),
             task_command: task_command.to_string(),
             started_at: Utc::now(),
             exit_code,
-            scope: scope,
+            scope,
+            cwd: task.get_option_cwd().map(|p| p.to_path_buf()),
+            env: task.get_option_env().cloned().unwrap_or_default(),
         }
     }
 }
@@ -59,7 +62,9 @@ impl History {
                 task_command TEXT    NOT NULL,
                 started_at   TEXT    NOT NULL,
                 exit_code    INTEGER NOT NULL,
-                scope        TEXT    NOT NULL
+                scope        TEXT    NOT NULL,
+                cwd          TEXT,
+                env          TEXT    NOT NULL DEFAULT '{}'
             );
         ",
         )?;
@@ -92,12 +97,23 @@ impl History {
     pub fn load() -> anyhow::Result<Vec<HistoryEntry>> {
         let conn = Self::connect()?;
         let mut stmt = conn.prepare(
-            "SELECT id, task_name, task_command, started_at, exit_code, scope
+            "SELECT id, task_name, task_command, started_at, exit_code, scope, cwd, env
          FROM task_history
          ORDER BY started_at DESC LIMIT 100",
         )?;
+
         let rows = stmt
             .query_map([], |row| {
+                let cwd: Option<String> = row.get(6)?;
+                let env_json: String = row.get(7)?;
+                let env: IndexMap<String, String> =
+                    serde_json::from_str(&env_json).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            7,
+                            rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?;
                 Ok(HistoryEntry {
                     id: row.get(0)?,
                     task_name: row.get(1)?,
@@ -105,6 +121,8 @@ impl History {
                     started_at: row.get(3)?,
                     exit_code: row.get(4)?,
                     scope: row.get(5)?,
+                    cwd: cwd.map(PathBuf::from),
+                    env,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -122,15 +140,20 @@ impl History {
     pub fn append(entry: &HistoryEntry) -> anyhow::Result<()> {
         let mut conn = Self::connect()?;
         let tx = conn.transaction()?;
+        let env_json = serde_json::to_string(&entry.env)?;
         tx.execute(
-            "INSERT INTO task_history (task_name, task_command, started_at, exit_code, scope)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO task_history (task_name, task_command, started_at, exit_code, scope, cwd, env)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 &entry.task_name,
                 &entry.task_command,
                 &entry.started_at,
                 &entry.exit_code,
                 entry.scope.to_string(),
+                entry.cwd
+                     .as_deref()
+                     .map(|p| p.to_string_lossy().into_owned()),
+                env_json,
             ],
         )?;
 

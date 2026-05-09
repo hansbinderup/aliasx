@@ -20,6 +20,7 @@ impl ConfigGenerator {
             label: "Simple task".to_string(),
             command: "echo 'This is just a simple task'".to_string(),
             conditions: None,
+            options: None,
         });
 
         tasks.tasks.insert(TaskEntry {
@@ -27,6 +28,7 @@ impl ConfigGenerator {
             label: "Perform build".to_string(),
             command: "echo 'building ${input:build-type} in ${mapping:build-dir}...'".to_string(),
             conditions: None,
+            options: None,
         });
 
         tasks.inputs.push(Input {

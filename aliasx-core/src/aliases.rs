@@ -17,6 +17,7 @@ fn parse_aliases(output: &str) -> Result<Tasks> {
                     command: cmd.trim_matches('\'').to_string(),
                     id: Option::None,
                     conditions: Option::None,
+                    options: Option::None,
                 };
                 tasks.tasks.insert(task);
             }
